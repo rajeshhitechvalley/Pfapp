@@ -34,6 +34,12 @@ class User extends Authenticatable
         'date_of_birth',
         'pan_number',
         'aadhar_number',
+        'occupation',
+        'bank_name',
+        'bank_account_number',
+        'bank_ifsc',
+        'photo',
+        'team_id',
     ];
 
     /**
@@ -142,21 +148,85 @@ class User extends Authenticatable
         return count(array_intersect($requiredDocuments, $approvedDocuments)) === count($requiredDocuments);
     }
 
+    // Team Management Methods
+    public function team()
+    {
+        return $this->belongsTo(Team::class, 'team_id');
+    }
+
+    public function teamMembership()
+    {
+        return $this->hasOne(TeamMember::class, 'user_id');
+    }
+
+    public function referralsMade()
+    {
+        return $this->hasMany(Referral::class, 'referrer_id');
+    }
+
+    public function referralsReceived()
+    {
+        return $this->hasMany(Referral::class, 'referee_id');
+    }
+
+    public function canCreateTeam(): bool
+    {
+        return $this->ledTeam === null && $this->status === 'active';
+    }
+
     public function canBeActivated(): bool
     {
-        return $this->registration_fee_paid >= 500 && 
-               $this->ledTeam && 
-               $this->ledTeam->member_count >= 20 &&
-               $this->isKycComplete();
+        return $this->registration_fee_paid >= 500 && $this->registration_approved;
+    }
+
+    public function getTeamRole(): string
+    {
+        if ($this->ledTeam) {
+            return 'Team Leader';
+        } elseif ($this->team) {
+            return 'Team Member';
+        }
+        return 'No Team';
+    }
+
+    public function getReferralStats(): array
+    {
+        return [
+            'total_referrals' => $this->referralsMade()->count(),
+            'completed_referrals' => $this->referralsMade()->completed()->count(),
+            'pending_referrals' => $this->referralsMade()->pending()->count(),
+            'total_commission' => $this->referralsMade()->sum('commission_amount'),
+            'paid_commission' => $this->referralsMade()->paid()->sum('commission_amount'),
+        ];
+    }
+
+    public function activate()
+    {
+        $this->update([
+            'status' => 'active',
+            'registration_approved' => true,
+        ]);
+    }
+
+    public function deactivate()
+    {
+        $this->update([
+            'status' => 'inactive',
+        ]);
+    }
+
+    public function getFormattedRegistrationFee(): string
+    {
+        return '₹' . number_format($this->registration_fee_paid, 2);
     }
 
     public function getRoleDisplayName(): string
     {
         return match($this->role) {
-            'investor' => 'Investor',
-            'team_leader' => 'Team Leader',
             'admin' => 'Administrator',
-            default => ucfirst($this->role)
+            'team_leader' => 'Team Leader',
+            'investor' => 'Investor',
+            default => 'User',
         };
     }
 
@@ -164,8 +234,9 @@ class User extends Authenticatable
     {
         return match($this->status) {
             'active' => 'green',
-            'inactive' => 'red',
-            default => 'gray'
+            'inactive' => 'yellow',
+            'suspended' => 'red',
+            default => 'gray',
         };
     }
 }

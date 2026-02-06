@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import AdminLayout from '@/layouts/AdminLayout';
 import { 
     Building, 
@@ -47,6 +47,24 @@ interface AdminPropertiesProps {
 
 export default function AdminProperties({ properties, pagination }: AdminPropertiesProps) {
     const propertiesArray = Array.isArray(properties) ? properties : [];
+
+    // Helper function to format currency
+    const formatCurrency = (amount: number | string | null | undefined): string => {
+        if (amount === null || amount === undefined || amount === '') {
+            return '₹0.00';
+        }
+        
+        const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+        
+        if (isNaN(numAmount)) {
+            return '₹0.00';
+        }
+        
+        return `₹${numAmount.toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        })}`;
+    };
     return (
         <AdminLayout title="Property Management">
             <Head title="Properties - Admin" />
@@ -60,10 +78,13 @@ export default function AdminProperties({ properties, pagination }: AdminPropert
                             <p className="text-sm text-gray-600 mt-1">Manage all property projects</p>
                         </div>
                         <div className="flex items-center space-x-3">
-                            <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200">
+                            <Link
+                                href="/admin/properties/create"
+                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+                            >
                                 <Building className="h-4 w-4 mr-2" />
                                 New Property
-                            </button>
+                            </Link>
                             <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200">
                                 <Download className="h-4 w-4 mr-2" />
                                 Export
@@ -210,7 +231,7 @@ export default function AdminProperties({ properties, pagination }: AdminPropert
                                     </div>
                                     <div className="space-y-2">
                                         <p className="text-sm font-medium text-gray-900">Total Investment</p>
-                                        <p className="text-lg font-semibold text-blue-600">₹{property.total_investment.toLocaleString()}</p>
+                                        <p className="text-lg font-semibold text-blue-600">{formatCurrency(property.total_investment)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -221,18 +242,31 @@ export default function AdminProperties({ properties, pagination }: AdminPropert
                                     <div className="text-xs text-gray-500">
                                         Created {new Date(property.created_at).toLocaleDateString()}
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                        <button className="text-blue-600 hover:text-blue-900 text-sm">
-                                            <Eye className="h-4 w-4 mr-2" />
-                                            View
-                                        </button>
-                                        <button className="text-green-600 hover:text-green-900 text-sm">
-                                            <Edit className="h-4 w-4 mr-2" />
-                                            Edit
-                                        </button>
-                                        <button className="text-red-600 hover:text-red-900 text-sm">
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Delete
+                                    <div className="flex items-center justify-end space-x-2">
+                                        <Link
+                                            href={`/admin/properties/${property.id}`}
+                                            className="text-blue-600 hover:text-blue-900"
+                                            title="View Property"
+                                        >
+                                            <Eye className="h-4 w-4" />
+                                        </Link>
+                                        <Link
+                                            href={`/admin/properties/${property.id}/edit`}
+                                            className="text-green-600 hover:text-green-900"
+                                            title="Edit Property"
+                                        >
+                                            <Edit className="h-4 w-4" />
+                                        </Link>
+                                        <button
+                                            onClick={() => {
+                                                if (confirm('Are you sure you want to delete this property? This action cannot be undone and will remove all associated data.')) {
+                                                    router.delete(`/admin/properties/${property.id}`);
+                                                }
+                                            }}
+                                            className="text-red-600 hover:text-red-900"
+                                            title="Delete Property"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
                                         </button>
                                     </div>
                                 </div>

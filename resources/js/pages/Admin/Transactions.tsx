@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import AdminLayout from '@/layouts/AdminLayout';
 import { 
     DollarSign, 
@@ -90,10 +90,13 @@ export default function AdminTransactions({ transactions, pagination }: AdminTra
                             <p className="text-sm text-gray-600 mt-1">Manage all financial transactions</p>
                         </div>
                         <div className="flex items-center space-x-3">
-                            <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200">
+                            <Link
+                                href="/admin/transactions/create"
+                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+                            >
                                 <DollarSign className="h-4 w-4 mr-2" />
                                 New Transaction
-                            </button>
+                            </Link>
                             <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200">
                                 <Download className="h-4 w-4 mr-2" />
                                 Export
@@ -281,15 +284,29 @@ export default function AdminTransactions({ transactions, pagination }: AdminTra
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end space-x-2">
-                                                <button className="text-blue-600 hover:text-blue-900">
+                                                <Link
+                                                    href={`/admin/transactions/${transaction.id}`}
+                                                    className="text-blue-600 hover:text-blue-900"
+                                                    title="View Transaction"
+                                                >
                                                     <Eye className="h-4 w-4" />
-                                                </button>
-                                                {transaction.status === 'pending' && (
-                                                    <button className="text-green-600 hover:text-green-900">
-                                                        <CheckCircle className="h-4 w-4" />
-                                                    </button>
-                                                )}
-                                                <button className="text-red-600 hover:text-red-900">
+                                                </Link>
+                                                <Link
+                                                    href={`/admin/transactions/${transaction.id}/edit`}
+                                                    className="text-green-600 hover:text-green-900"
+                                                    title="Edit Transaction"
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </Link>
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm('Are you sure you want to delete this transaction? This action cannot be undone and will affect the user\'s wallet balance.')) {
+                                                            router.delete(`/admin/transactions/${transaction.id}`);
+                                                        }
+                                                    }}
+                                                    className="text-red-600 hover:text-red-900"
+                                                    title="Delete Transaction"
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>
                                             </div>

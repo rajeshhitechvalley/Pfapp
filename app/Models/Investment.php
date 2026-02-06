@@ -11,7 +11,7 @@ class Investment extends Model
 
     protected $fillable = [
         'user_id',
-        'property_id',
+        'property_project_id',
         'plot_id',
         'amount',
         'investment_type',
@@ -28,6 +28,26 @@ class Investment extends Model
         'maturity_date',
         'reinvestment_count',
         'source_investment_id', // For reinvestment tracking
+        'auto_reinvest', // Auto-reinvest setting
+        'reinvest_percentage', // Percentage of returns to auto-reinvest
+        'modification_requested', // For investment modification tracking
+        'modification_details', // JSON field for modification details
+        'modification_requested_at', // When modification was requested
+        'modification_approved_by', // Who approved the modification
+        'modification_approved_at', // When modification was approved
+        'cancellation_reason', // Reason for cancellation
+        'cancelled_by', // Who cancelled the investment
+        'cancelled_at', // When investment was cancelled
+        'investment_id', // Unique investment identifier
+        'project_allocation', // JSON field for project-wise allocation
+        'plot_allocation', // JSON field for plot-wise allocation
+        'is_split_investment', // Flag for split investments across multiple plots
+        'parent_investment_id', // For tracking split investments
+        'investment_tier', // Investment tier based on amount
+        'special_terms', // Any special terms for the investment
+        'risk_level', // Risk level assessment
+        'expected_liquidity_date', // When investment can be liquidated
+        'actual_liquidation_date', // When investment was actually liquidated
     ];
 
     protected function casts(): array
@@ -43,6 +63,21 @@ class Investment extends Model
             'return_rate' => 'decimal:4',
             'maturity_date' => 'date',
             'reinvestment_count' => 'integer',
+            'auto_reinvest' => 'boolean',
+            'reinvest_percentage' => 'integer',
+            'modification_requested' => 'boolean',
+            'modification_details' => 'array',
+            'modification_requested_at' => 'datetime',
+            'modification_approved_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'project_allocation' => 'array',
+            'plot_allocation' => 'array',
+            'is_split_investment' => 'boolean',
+            'investment_tier' => 'string',
+            'special_terms' => 'array',
+            'risk_level' => 'string',
+            'expected_liquidity_date' => 'date',
+            'actual_liquidation_date' => 'date',
         ];
     }
 
@@ -53,7 +88,12 @@ class Investment extends Model
 
     public function property()
     {
-        return $this->belongsTo(Property::class);
+        return $this->belongsTo(PropertyProject::class, 'property_project_id');
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(PropertyProject::class, 'property_project_id');
     }
 
     public function plot()
@@ -64,6 +104,26 @@ class Investment extends Model
     public function approver()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function modifier()
+    {
+        return $this->belongsTo(User::class, 'modification_approved_by');
+    }
+
+    public function canceller()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    public function parentInvestment()
+    {
+        return $this->belongsTo(Investment::class, 'parent_investment_id');
+    }
+
+    public function splitInvestments()
+    {
+        return $this->hasMany(Investment::class, 'parent_investment_id');
     }
 
     public function transactions()
@@ -107,6 +167,16 @@ class Investment extends Model
         return $query->where('status', 'completed');
     }
 
+    public function scopeCancelled($query)
+    {
+        return $query->where('status', 'cancelled');
+    }
+
+    public function scopePendingApproval($query)
+    {
+        return $query->where('status', 'pending_approval');
+    }
+
     public function scopeByUser($query, $userId)
     {
         return $query->where('user_id', $userId);
@@ -121,14 +191,50 @@ class Investment extends Model
         });
     }
 
-    public function scopeByProperty($query, $propertyId)
+    public function scopeByProject($query, $projectId)
     {
-        return $query->where('property_id', $propertyId);
+        return $query->where('property_project_id', $projectId);
     }
 
     public function scopeByPlot($query, $plotId)
     {
         return $query->where('plot_id', $plotId);
+    }
+
+    public function scopeByType($query, $type)
+    {
+        return $query->where('investment_type', $type);
+    }
+
+    public function scopeByTier($query, $tier)
+    {
+        return $query->where('investment_tier', $tier);
+    }
+
+    public function scopeByRiskLevel($query, $riskLevel)
+    {
+        return $query->where('risk_level', $riskLevel);
+    }
+
+    public function scopeAutoReinvest($query)
+    {
+        return $query->where('auto_reinvest', true);
+    }
+
+    public function scopeSplitInvestments($query)
+    {
+        return $query->where('is_split_investment', true);
+    }
+
+    public function scopeMatured($query)
+    {
+        return $query->where('maturity_date', '<=', now());
+    }
+
+    public function scopeLiquidatable($query)
+    {
+        return $query->where('expected_liquidity_date', '<=', now())
+                    ->where('status', 'active');
     }
 
     // Status methods
@@ -152,6 +258,33 @@ class Investment extends Model
         return $this->status === 'cancelled';
     }
 
+    public function isPendingApproval(): bool
+    {
+        return $this->status === 'pending_approval';
+    }
+
+    public function isMatured(): bool
+    {
+        return $this->maturity_date && $this->maturity_date->isPast();
+    }
+
+    public function isLiquidatable(): bool
+    {
+        return $this->expected_liquidity_date && 
+               $this->expected_liquidity_date->isPast() && 
+               $this->isActive();
+    }
+
+    public function isSplitInvestment(): bool
+    {
+        return $this->is_split_investment;
+    }
+
+    public function hasAutoReinvest(): bool
+    {
+        return $this->auto_reinvest;
+    }
+
     public function canBeApproved(): bool
     {
         return $this->isPending() && $this->user->canInvest();
@@ -160,6 +293,21 @@ class Investment extends Model
     public function canBeReinvested(): bool
     {
         return $this->isCompleted() && $this->actual_return > 0;
+    }
+
+    public function canBeModified(): bool
+    {
+        return $this->isPending() && !$this->modification_requested;
+    }
+
+    public function canBeCancelled(): bool
+    {
+        return $this->isPending() || $this->isPendingApproval();
+    }
+
+    public function canBeLiquidated(): bool
+    {
+        return $this->isLiquidatable();
     }
 
     // Investment validation methods

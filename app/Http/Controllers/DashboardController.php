@@ -8,9 +8,12 @@ use App\Models\Investment;
 use App\Models\Team;
 use App\Models\Plot;
 use App\Models\PropertyProject;
+use App\Models\PlotHolding;
+use App\Models\Transaction;
+use App\Models\Notification;
 use App\Models\Profit;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Support\Facades\Auth;
@@ -22,534 +25,567 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
         
-        // Get user's wallet
-        $wallet = $user->wallet;
+        // REQ-UD-001: Dashboard Overview
+        // REQ-UD-002: Quick Stats Display
+        $stats = $this->getUserStats($user);
         
-        // Get user's investments
-        $investments = $user->investments()
-            ->with(['property', 'plot'])
-            ->orderBy('created_at', 'desc')
-            ->take(5)
-            ->get();
+        // REQ-UD-003: View Available Projects
+        $projects = $this->getAvailableProjects($user);
         
-        // Get user's team
-        $team = $user->ledTeam;
-        $teamMembers = $team ? $team->teamMembers()->with('user')->get() : collect([]);
+        // REQ-UD-004: View Available Plots
+        $plots = $this->getAvailablePlots($user);
         
-        // Get available projects and plots
-        $availableProjects = PropertyProject::where('status', 'active')
-            ->withCount('plots')
-            ->take(6)
-            ->get();
-            
-        $availablePlots = Plot::where('status', 'available')
-            ->with('property')
-            ->take(10)
-            ->get();
+        // REQ-UD-006: Wallet Balance Display
+        $walletData = $this->getWalletData($user);
         
-        // Get user's profits
-        $profits = $user->profits()
-            ->with(['sale.plot.property', 'investment'])
-            ->orderBy('created_at', 'desc')
-            ->take(5)
-            ->get();
+        // REQ-UD-007: Investment Overview
+        $investmentData = $this->getInvestmentData($user);
         
-        // Calculate statistics
-        $stats = $this->calculateUserStats($user);
+        // REQ-UD-008: Team Summary Display
+        $teamData = $this->getTeamData($user);
         
-        // Get eligibility indicators
+        // REQ-UD-011: Recent Activities Feed
+        $activities = $this->getRecentActivities($user);
+        
+        // REQ-UD-012: Notifications Center
+        $notifications = $this->getNotifications($user);
+        
+        // REQ-UD-009: Investment Eligibility Indicators
         $eligibility = $this->getEligibilityIndicators($user);
         
-        // Get plot comparison data
-        $plotComparison = $this->getPlotComparison($user);
-        
-        // Get profit and return summary
-        $profitSummary = $this->getProfitReturnSummary($user);
+        // REQ-UD-014: Dashboard Personalization
+        $preferences = $this->getUserPreferences($user);
 
-        return Inertia::render('Dashboard/Index', [
-            'user' => $user,
-            'wallet' => $wallet,
-            'investments' => $investments,
-            'team' => $team,
-            'teamMembers' => $teamMembers,
-            'availableProjects' => $availableProjects,
-            'availablePlots' => $availablePlots,
-            'profits' => $profits,
+        return Inertia::render('UserDashboard', [
             'stats' => $stats,
+            'projects' => $projects,
+            'plots' => $plots,
+            'wallet' => $walletData,
+            'investment' => $investmentData,
+            'team' => $teamData,
+            'activities' => $activities,
+            'notifications' => $notifications,
             'eligibility' => $eligibility,
-            'plotComparison' => $plotComparison,
-            'profitSummary' => $profitSummary,
+            'preferences' => $preferences,
         ]);
     }
 
-    public function getWalletDetails(): Response
+    public function getStats(Request $request): JsonResponse
     {
         $user = Auth::user();
-        $wallet = $user->wallet;
+        $stats = $this->getUserStats($user);
         
-        $transactions = $wallet->transactions()
-            ->orderBy('created_at', 'desc')
-            ->take(10)
-            ->get();
-        
-        $transactionSummary = $this->getTransactionSummary($wallet);
-        
-        return Inertia::render('Dashboard/Wallet', [
-            'wallet' => $wallet,
-            'transactions' => $transactions,
-            'transactionSummary' => $transactionSummary,
+        return response()->json([
+            'success' => true,
+            'data' => $stats
         ]);
     }
 
-    public function getInvestments(): Response
+    public function getProjects(Request $request): JsonResponse
     {
         $user = Auth::user();
+        $projects = $this->getAvailableProjects($user);
         
-        $investments = $user->investments()
-            ->with(['property', 'plot', 'profit'])
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
-        
-        $investmentStats = $this->getInvestmentStats($user);
-        $investmentPerformance = $this->getInvestmentPerformance($user);
-        
-        return Inertia::render('Dashboard/Investments', [
-            'investments' => $investments->items(),
-            'pagination' => [
-                'current_page' => $investments->currentPage(),
-                'last_page' => $investments->lastPage(),
-                'per_page' => $investments->perPage(),
-                'total' => $investments->total(),
-                'from' => $investments->firstItem(),
-                'to' => $investments->lastItem(),
-            ],
-            'investmentStats' => $investmentStats,
-            'investmentPerformance' => $investmentPerformance,
+        return response()->json([
+            'success' => true,
+            'data' => $projects
         ]);
     }
 
-    public function getTeam(): Response
+    public function getPlots(Request $request): JsonResponse
     {
         $user = Auth::user();
+        $plots = $this->getAvailablePlots($user);
         
-        $team = $user->ledTeam;
-        $teamMembers = $team ? $team->teamMembers()->with('user')->get() : collect([]);
-        
-        $teamStats = $this->getTeamStats($team);
-        $teamPerformance = $this->getTeamPerformance($team);
-        
-        return Inertia::render('Dashboard/Team', [
-            'team' => $team,
-            'teamMembers' => $teamMembers,
-            'teamStats' => $teamStats,
-            'teamPerformance' => $teamPerformance,
+        return response()->json([
+            'success' => true,
+            'data' => $plots
         ]);
     }
 
-    public function getProjects(): Response
+    // REQ-UD-005: Plot Comparison Interface
+    public function comparePlots(Request $request): JsonResponse
     {
+        $request->validate([
+            'plot_ids' => 'required|array|min:2|max:4',
+            'plot_ids.*' => 'exists:plots,id'
+        ]);
+
+        $user = Auth::user();
+        $plotIds = $request->plot_ids;
+        
+        $plots = Plot::with(['project'])
+            ->whereIn('id', $plotIds)
+            ->get()
+            ->map(function ($plot) use ($user) {
+                return [
+                    'id' => $plot->id,
+                    'plot_number' => $plot->plot_number,
+                    'project_name' => $plot->project->name,
+                    'area' => $plot->area,
+                    'area_unit' => $plot->area_unit,
+                    'price' => $plot->price,
+                    'plot_type' => $plot->plot_type,
+                    'facing' => $plot->facing ?? 'N/A',
+                    'road_width' => $plot->road_width,
+                    'corner_plot' => $plot->corner_plot,
+                    'double_road' => $plot->double_road,
+                    'features' => $plot->features,
+                    'nearby_amenities' => $plot->nearby_amenities ?? [],
+                    'utilities' => $plot->utilities ?? [],
+                    'status' => $plot->status,
+                    'is_available' => $plot->status === 'available' && !$plot->is_held,
+                    'can_hold' => $plot->status === 'available' && !$plot->is_held,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $plots
+        ]);
+    }
+
+    // REQ-UD-014: Dashboard Personalization
+    public function updatePreferences(Request $request): JsonResponse
+    {
+        $request->validate([
+            'widgets' => 'required|array',
+            'theme' => 'required|string|in:light,dark,auto',
+            'layout' => 'required|string|in:grid,list,compact',
+        ]);
+
         $user = Auth::user();
         
-        $availableProjects = PropertyProject::where('status', 'active')
-            ->with(['plots', 'sales', 'investments'])
-            ->orderBy('created_at', 'desc')
-            ->paginate(9);
-        
-        $projectStats = $this->getProjectStats($user);
-        $recommendedProjects = $this->getRecommendedProjects($user);
-        
-        return Inertia::render('Dashboard/Projects', [
-            'projects' => $availableProjects->items(),
-            'pagination' => [
-                'current_page' => $availableProjects->currentPage(),
-                'last_page' => $availableProjects->lastPage(),
-                'per_page' => $availableProjects->perPage(),
-                'total' => $availableProjects->total(),
-                'from' => $availableProjects->firstItem(),
-                'to' => $availableProjects->lastItem(),
-            ],
-            'projectStats' => $projectStats,
-            'recommendedProjects' => $recommendedProjects,
+        $user->update([
+            'dashboard_preferences' => [
+                'widgets' => $request->widgets,
+                'theme' => $request->theme,
+                'layout' => $request->layout,
+            ]
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Preferences updated successfully'
         ]);
     }
 
-    public function getPlots(): Response
+    private function getUserStats(User $user): array
     {
-        $user = Auth::user();
-        
-        $plots = Plot::where('status', 'available')
-            ->with(['property', 'sales'])
-            ->orderBy('created_at', 'desc')
-            ->paginate(12);
-        
-        $plotComparison = $this->getPlotComparison($user);
-        $plotStats = $this->getPlotStats($user);
-        
-        return Inertia::render('Dashboard/Plots', [
-            'plots' => $plots->items(),
-            'pagination' => [
-                'current_page' => $plots->currentPage(),
-                'last_page' => $plots->lastPage(),
-                'per_page' => $plots->perPage(),
-                'total' => $plots->total(),
-                'from' => $plots->firstItem(),
-                'to' => $plots->lastItem(),
-            ],
-            'plotComparison' => $plotComparison,
-            'plotStats' => $plotStats,
-        ]);
-    }
+        // REQ-UD-002: Quick Stats Display
+        $totalInvested = Investment::where('user_id', $user->id)
+            ->where('status', 'approved')
+            ->sum('amount');
 
-    public function getProfits(): Response
-    {
-        $user = Auth::user();
-        
-        $profits = $user->profits()
-            ->with(['sale.plot.property', 'investment'])
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
-        
-        $profitSummary = $this->getProfitReturnSummary($user);
-        $profitTrends = $this->getProfitTrends($user);
-        
-        return Inertia::render('Dashboard/Profits', [
-            'profits' => $profits->items(),
-            'pagination' => [
-                'current_page' => $profits->currentPage(),
-                'last_page' => $profits->lastPage(),
-                'per_page' => $profits->perPage(),
-                'total' => $profits->total(),
-                'from' => $profits->firstItem(),
-                'to' => $profits->lastItem(),
-            ],
-            'profitSummary' => $profitSummary,
-            'profitTrends' => $profitTrends,
-        ]);
-    }
+        $totalProfit = DB::table('profits')
+            ->where('user_id', $user->id)
+            ->sum('investor_share');
 
-    public function getProfile(): Response
-    {
-        $user = Auth::user();
-        
-        $userStats = $this->calculateUserStats($user);
-        $recentActivity = $this->getRecentActivity($user);
-        
-        return Inertia::render('Dashboard/Profile', [
-            'user' => $user,
-            'userStats' => $userStats,
-            'recentActivity' => $recentActivity,
-        ]);
-    }
+        $wallet = Wallet::where('user_id', $user->id)->first();
+        $walletBalance = $wallet ? $wallet->balance : 0;
 
-    // Helper Methods
-    private function calculateUserStats(User $user): array
-    {
-        $totalInvested = $user->investments()->sum('amount');
-        $totalReturns = $user->profits()->sum('investor_share');
-        $activeInvestments = $user->investments()->where('status', 'active')->count();
-        $completedInvestments = $user->investments()->where('status', 'completed')->count();
-        
+        $teamSize = Team::where('team_leader_id', $user->id)->count();
+
+        $teamValue = DB::table('investments')
+            ->join('team_members', 'investments.user_id', '=', 'team_members.user_id')
+            ->join('teams', 'team_members.team_id', '=', 'teams.id')
+            ->where('teams.team_leader_id', $user->id)
+            ->sum('investments.amount');
+
+        $availableProjects = PropertyProject::where('status', 'Ready for Sale')
+            ->where('approval_status', 'approved')
+            ->count();
+
+        $plotsHeld = PlotHolding::where('user_id', $user->id)
+            ->where('hold_status', 'active')
+            ->count();
+
+        $recentTransactions = Transaction::where('user_id', $user->id)
+            ->where('created_at', '>=', now()->subDays(30))
+            ->count();
+
+        $unreadNotifications = Notification::where('user_id', $user->id)
+            ->where('read', false)
+            ->count();
+
         return [
             'total_invested' => $totalInvested,
-            'total_returns' => $totalReturns,
-            'net_profit' => $totalReturns - $totalInvested,
-            'active_investments' => $activeInvestments,
-            'completed_investments' => $completedInvestments,
-            'roi_percentage' => $totalInvested > 0 ? round(($totalReturns / $totalInvested) * 100, 2) : 0,
-            'investment_count' => $user->investments()->count(),
+            'total_profit' => $totalProfit,
+            'wallet_balance' => $walletBalance,
+            'team_size' => $teamSize,
+            'team_value' => $teamValue,
+            'available_projects' => $availableProjects,
+            'plots_held' => $plotsHeld,
+            'recent_transactions' => $recentTransactions,
+            'unread_notifications' => $unreadNotifications,
         ];
     }
 
-    private function getEligibilityIndicators(User $user): array
+    private function getAvailableProjects(User $user): array
     {
-        $wallet = $user->wallet;
-        $team = $user->ledTeam;
-        $hasActiveInvestments = $user->investments()->where('status', 'active')->exists();
-        $isKycVerified = $user->kyc_verified;
-        $isTeamActive = $team && $team->status === 'active';
-        $teamValue = $team ? $team->teamMembers()->sum('wallet.balance') : 0;
-        
-        return [
-            'can_invest' => $wallet && $wallet->balance > 0 && $isKycVerified,
-            'has_active_investments' => $hasActiveInvestments,
-            'kyc_verified' => $isKycVerified,
-            'team_active' => $isTeamActive,
-            'team_value_met' => $teamValue >= 10000, // Minimum team value requirement
-            'wallet_balance' => $wallet ? $wallet->balance : 0,
-            'min_investment_met' => $wallet && $wallet->balance >= 500, // Minimum investment amount
-        ];
-    }
-
-    private function getPlotComparison(User $user): array
-    {
-        $userPlots = $user->investments()
-            ->whereHas('plot')
-            ->with('plot')
+        // REQ-UD-003: View Available Projects
+        $projects = PropertyProject::with(['plots'])
+            ->where('status', 'Ready for Sale')
+            ->where('approval_status', 'approved')
+            ->orderBy('created_at', 'desc')
+            ->limit(6)
             ->get()
-            ->pluck('plot');
-        
-        $avgPlotPrice = $userPlots->avg('price') ?? 0;
-        $userAvgPrice = $userPlots->avg('pivot.price') ?? 0;
-        
-        $marketPlots = Plot::where('status', 'available')
-            ->take(100)
-            ->get();
-        
-        $marketAvgPrice = $marketPlots->avg('price') ?? 0;
-        
-        return [
-            'user_plots_count' => $userPlots->count(),
-            'user_avg_price' => $userAvgPrice,
-            'market_avg_price' => $marketAvgPrice,
-            'price_difference' => $marketAvgPrice - $userAvgPrice,
-            'price_difference_percentage' => $marketAvgPrice > 0 ? round((($marketAvgPrice - $userAvgPrice) / $marketAvgPrice) * 100, 2) : 0,
-        ];
+            ->map(function ($project) use ($user) {
+                return [
+                    'id' => $project->id,
+                    'name' => $project->name,
+                    'type' => $project->type,
+                    'location' => $project->location,
+                    'total_plots' => $project->total_plots,
+                    'available_plots' => $project->available_plots,
+                    'price_per_plot' => $project->price_per_plot,
+                    'image' => $project->featured_image,
+                    'status' => $project->status,
+                    'progress' => $project->total_plots > 0 
+                        ? (($project->total_plots - $project->available_plots) / $project->total_plots) * 100 
+                        : 0,
+                    'eligible' => $this->checkProjectEligibility($user, $project),
+                ];
+            });
+
+        return $projects->toArray();
     }
 
-    private function getProfitReturnSummary(User $user): array
+    private function getAvailablePlots(User $user): array
     {
-        $profits = $user->profits()
-            ->selectRaw('
-                SUM(investor_share) as total_investor_profits,
-                SUM(company_share) as total_company_profits,
-                COUNT(*) as total_profits,
-                AVG(investor_share) as avg_profit,
-                MAX(investor_share) as max_profit
-            ')
+        // REQ-UD-004: View Available Plots
+        $plots = Plot::with(['project'])
+            ->where('status', 'available')
+            ->where('is_held', false)
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function ($plot) use ($user) {
+                return [
+                    'id' => $plot->id,
+                    'plot_number' => $plot->plot_number,
+                    'project_name' => $plot->project->name,
+                    'area' => $plot->area,
+                    'area_unit' => $plot->area_unit,
+                    'price' => $plot->price,
+                    'plot_type' => $plot->plot_type,
+                    'facing' => $plot->facing ?? 'N/A',
+                    'status' => $plot->status,
+                    'is_held' => $plot->is_held,
+                    'is_corner' => $plot->corner_plot,
+                    'is_double_road' => $plot->double_road,
+                    'features' => $plot->features,
+                    'eligible' => $this->checkPlotEligibility($user, $plot),
+                ];
+            });
+
+        return $plots->toArray();
+    }
+
+    private function getWalletData(User $user): array
+    {
+        // REQ-UD-006: Wallet Balance Display
+        $wallet = Wallet::where('user_id', $user->id)->first();
+        
+        if (!$wallet) {
+            return [
+                'balance' => 0,
+                'total_deposited' => 0,
+                'total_withdrawn' => 0,
+                'last_transaction' => null,
+            ];
+        }
+
+        $totalDeposited = Transaction::where('user_id', $user->id)
+            ->where('type', 'deposit')
+            ->where('status', 'completed')
+            ->sum('amount');
+
+        $totalWithdrawn = Transaction::where('user_id', $user->id)
+            ->where('type', 'withdrawal')
+            ->where('status', 'completed')
+            ->sum('amount');
+
+        $lastTransaction = Transaction::where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
             ->first();
-        
-        $totalInvested = $user->investments()->sum('amount');
-        
+
         return [
-            'total_investor_profits' => $profits->total_investor_profits ?? 0,
-            'total_company_profits' => $profits->total_company_profits ?? 0,
-            'total_profits' => $profits->total_profits ?? 0,
-            'avg_profit' => $profits->avg_profit ?? 0,
-            'max_profit' => $profits->max_profit ?? 0,
-            'total_invested' => $totalInvested,
-            'overall_roi' => $totalInvested > 0 ? round((($profits->total_investor_profits ?? 0) / $totalInvested) * 100, 2) : 0,
+            'balance' => $wallet->balance,
+            'total_deposited' => $totalDeposited,
+            'total_withdrawn' => $totalWithdrawn,
+            'last_transaction' => $lastTransaction ? [
+                'type' => $lastTransaction->type,
+                'amount' => $lastTransaction->amount,
+                'description' => $lastTransaction->description,
+                'created_at' => $lastTransaction->created_at,
+            ] : null,
         ];
     }
 
-    private function getInvestmentStats(User $user): array
+    private function getInvestmentData(User $user): array
     {
-        $investments = $user->investments();
-        
-        return [
-            'total_count' => $investments->count(),
-            'active_count' => $investments->where('status', 'active')->count(),
-            'completed_count' => $investments->where('status', 'completed')->count(),
-            'total_amount' => $investments->sum('amount'),
-            'avg_amount' => $investments->avg('amount') ?? 0,
-            'by_type' => $investments->selectRaw('
-                investment_type,
-                COUNT(*) as count,
-                SUM(amount) as total,
-                AVG(amount) as average
-            ')
-            ->groupBy('investment_type')
-            ->get(),
-        ];
-    }
-
-    private function getInvestmentPerformance(User $user): array
-    {
-        $investments = $user->investments()
-            ->with(['profit'])
-            ->orderBy('created_at', 'desc')
-            ->take(10)
+        // REQ-UD-007: Investment Overview
+        $investments = Investment::where('user_id', $user->id)
+            ->where('status', 'approved')
             ->get();
-        
-        $performance = $investments->map(function ($investment) {
-            $roi = $investment->amount > 0 ? 
-                round((($investment->profit?->investor_share ?? 0) / $investment->amount) * 100, 2) : 0;
-            
-            return [
-                'id' => $investment->id,
-                'amount' => $investment->amount,
-                'type' => $investment->investment_type,
-                'status' => $investment->status,
-                'created_at' => $investment->created_at,
-                'profit' => $investment->profit,
-                'roi_percentage' => $roi,
-            ];
-        });
-        
-        return $performance->toArray();
-    }
 
-    private function getTeamStats($team): array
-    {
-        if (!$team) {
-            return [
-                'total_members' => 0,
-                'active_members' => 0,
-                'total_invested' => 0,
-                'total_value' => 0,
-            ];
-        }
+        $totalInvested = $investments->sum('amount');
+        $activeCount = $investments->where('status', 'active')->count();
         
-        return [
-            'total_members' => $team->teamMembers()->count(),
-            'active_members' => $team->teamMembers()->whereHas('wallet', function ($query) {
-                $query->where('balance', '>', 0);
-            })->count(),
-            'total_invested' => $team->teamMembers()->sum('wallet.balance'),
-            'total_value' => $team->teamMembers()->sum('wallet.balance'),
-            'member_rankings' => $this->getMemberRankings($team),
-        ];
-    }
-
-    private function getTeamPerformance($team): array
-    {
-        if (!$team) {
-            return [];
-        }
-        
-        return $team->teamMembers()
-            ->with(['investments', 'profits'])
-            ->get()
-            ->map(function ($member) {
-                $totalInvested = $member->investments->sum('amount');
-                $totalReturns = $member->profits->sum('investor_share');
-                
+        // Project distribution
+        $projectDistribution = $investments
+            ->groupBy('property_project_id')
+            ->map(function ($group) {
                 return [
-                    'member' => $member,
-                    'total_invested' => $totalInvested,
-                    'total_returns' => $totalReturns,
-                    'net_profit' => $totalReturns - $totalInvested,
-                    'investment_count' => $member->investments->count(),
-                    'profit_count' => $member->profits->count(),
+                    'project_id' => $group->first()->property_project_id,
+                    'amount' => $group->sum('amount'),
+                    'count' => $group->count(),
                 ];
             })
-            ->toArray();
-    }
+            ->values();
 
-    private function getMemberRankings($team): array
-    {
-        return $team->teamMembers()
-            ->withCount(['investments', 'profits'])
-            ->with(['investments' => function ($query) {
-                $query->selectRaw('SUM(amount) as total_invested');
-            }, 'profits' => function ($query) {
-                $query->selectRaw('SUM(investor_share) as total_profits');
-            }])
-            ->orderByDesc('investments_count')
-            ->get()
-            ->map(function ($member, $index) {
-                return [
-                    'rank' => $index + 1,
-                    'name' => $member->name,
-                    'total_invested' => $member->investments_total_invested ?? 0,
-                    'total_profits' => $member->profits_total_profits ?? 0,
-                    'investments_count' => $member->investments_count ?? 0,
-                    'profits_count' => $member->profits_count ?? 0,
-                ];
-            })
-            ->toArray();
-    }
-
-    private function getProjectStats(User $user): array
-    {
-        $investments = $user->investments();
-        $investedProjects = $investments->pluck('property_project_id')->unique();
-        
-        return [
-            'total_projects' => $investedProjects->count(),
-            'active_projects' => PropertyProject::whereIn('id', $investedProjects)->where('status', 'active')->count(),
-            'total_invested' => $investments->sum('amount'),
-            'avg_investment' => $investments->avg('amount') ?? 0,
-            'by_type' => $investments->join('property_projects', 'investments.property_project_id', '=', 'property_projects.id')
-                ->selectRaw('
-                    property_projects.type,
-                    COUNT(investments.id) as count,
-                    SUM(investments.amount) as total
-                ')
-                ->groupBy('property_projects.type')
-                ->get(),
-        ];
-    }
-
-    private function getRecommendedProjects(User $user): array
-    {
-        $userInvestments = $user->investments();
-        $investedTypes = $userInvestments->pluck('investment_type')->unique();
-        
-        return PropertyProject::where('status', 'active')
-            ->whereIn('type', $investedTypes)
-            ->withCount('plots')
+        $latestTransaction = Transaction::where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
-            ->take(3)
-            ->get()
-            ->toArray();
+            ->first();
+
+        $expectedReturns = $investments->sum(function ($investment) {
+            return $investment->amount * ($investment->expected_return / 100);
+        });
+
+        return [
+            'total_invested' => $totalInvested,
+            'active_count' => $activeCount,
+            'project_distribution' => $projectDistribution,
+            'latest_transaction' => $latestTransaction,
+            'expected_returns' => $expectedReturns,
+            'roi_percentage' => $totalInvested > 0 ? ($expectedReturns / $totalInvested) * 100 : 0,
+        ];
     }
 
-    private function getPlotStats(User $user): array
+    private function getTeamData(User $user): array
     {
-        $userPlots = $user->investments()
-            ->whereHas('plot')
-            ->with('plot')
-            ->get()
-            ->pluck('plot');
-        
+        // REQ-UD-008: Team Summary Display
+        $teamMembers = Team::where('team_leader_id', $user->id)
+            ->with('member')
+            ->get();
+
+        $teamSize = $teamMembers->count();
+        $teamValue = $teamMembers->sum(function ($member) {
+            return $member->member->total_investment ?? 0;
+        });
+
+        $referralCount = User::where('referred_by', $user->id)->count();
+        $referralLink = route('register', ['ref' => $user->referral_code]);
+
         return [
-            'total_plots' => $userPlots->count(),
-            'total_value' => $userPlots->sum('pivot.price'),
-            'avg_price' => $userPlots->avg('pivot.price') ?? 0,
-            'by_project' => $userPlots->groupBy('property.name')->map(function ($plots, $project) {
+            'team_size' => $teamSize,
+            'team_value' => $teamValue,
+            'referral_count' => $referralCount,
+            'referral_link' => $referralLink,
+            'progress_percentage' => ($teamSize / 20) * 100,
+            'members' => $teamMembers->map(function ($member) {
                 return [
-                    'project' => $project,
-                    'count' => $plots->count(),
-                    'total_value' => $plots->sum('pivot.price'),
+                    'id' => $member->id,
+                    'name' => $member->member->name,
+                    'email' => $member->member->email,
+                    'role' => $member->role,
+                    'status' => $member->member->status,
+                    'avatar' => $member->member->avatar,
                 ];
             }),
         ];
     }
 
-    private function getProfitTrends(User $user): array
+    private function getRecentActivities(User $user): array
     {
-        return $user->profits()
-            ->selectRaw('
-                DATE_FORMAT(created_at, "%Y-%m") as month,
-                SUM(investor_share) as total_profit,
-                COUNT(*) as count
-            ')
-            ->groupByRaw('DATE_FORMAT(created_at, "%Y-%m")')
-            ->orderBy('month', 'desc')
-            ->limit(12)
-            ->get()
+        // REQ-UD-011: Recent Activities Feed
+        $activities = collect();
+
+        // Recent investments
+        $investments = Investment::where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get();
+
+        foreach ($investments as $investment) {
+            $activities->push([
+                'type' => 'investment',
+                'title' => 'New Investment',
+                'description' => "Invested ₹{$investment->amount} in {$investment->propertyProject->name}",
+                'amount' => $investment->amount,
+                'created_at' => $investment->created_at,
+                'icon' => 'trending-up',
+                'color' => 'blue',
+            ]);
+        }
+
+        // Recent plot holdings
+        $holdings = PlotHolding::where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get();
+
+        foreach ($holdings as $holding) {
+            $activities->push([
+                'type' => 'plot_hold',
+                'title' => 'Plot Held',
+                'description' => "Held plot {$holding->plot->plot_number} in {$holding->plot->project->name}",
+                'amount' => $holding->hold_amount,
+                'created_at' => $holding->created_at,
+                'icon' => 'map-pin',
+                'color' => 'green',
+            ]);
+        }
+
+        // Recent transactions
+        $transactions = Transaction::where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get();
+
+        foreach ($transactions as $transaction) {
+            $activities->push([
+                'type' => 'transaction',
+                'title' => ucfirst($transaction->type),
+                'description' => $transaction->description,
+                'amount' => $transaction->amount,
+                'created_at' => $transaction->created_at,
+                'icon' => $transaction->type === 'deposit' ? 'arrow-down' : 'arrow-up',
+                'color' => $transaction->type === 'deposit' ? 'green' : 'red',
+            ]);
+        }
+
+        return $activities
+            ->sortByDesc('created_at')
+            ->take(15)
+            ->values()
             ->toArray();
     }
 
-    private function getTransactionSummary($wallet): array
+    private function getNotifications(User $user): array
     {
+        // REQ-UD-012: Notifications Center
+        return Notification::where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function ($notification) {
+                return [
+                    'id' => $notification->id,
+                    'type' => $notification->type,
+                    'title' => $notification->title,
+                    'message' => $notification->message,
+                    'created_at' => $notification->created_at,
+                    'read' => $notification->read,
+                ];
+            })
+            ->toArray();
+    }
+
+    private function getEligibilityIndicators(User $user): array
+    {
+        // REQ-UD-009: Investment Eligibility Indicators
+        $wallet = Wallet::where('user_id', $user->id)->first();
+        $walletBalance = $wallet ? $wallet->balance : 0;
+        
+        $teamValue = DB::table('investments')
+            ->join('team_members', 'investments.user_id', '=', 'team_members.user_id')
+            ->join('teams', 'team_members.team_id', '=', 'teams.id')
+            ->where('teams.team_leader_id', $user->id)
+            ->sum('investments.amount');
+
+        $totalInvestment = Investment::where('user_id', $user->id)
+            ->where('status', 'approved')
+            ->sum('amount');
+
         return [
-            'total_transactions' => $wallet->transactions()->count(),
-            'total_deposits' => $wallet->transactions()->where('type', 'deposit')->sum('amount'),
-            'total_withdrawals' => $wallet->transactions()->where('type', 'withdrawal')->sum('amount'),
-            'total_investments' => $wallet->transactions()->where('type', 'investment')->sum('amount'),
-            'total_profits' => $wallet->transactions()->where('type', 'profit')->sum('amount'),
-            'pending_transactions' => $wallet->transactions()->where('status', 'pending')->count(),
+            'account_status' => $user->status === 'active' ? 'active' : 'inactive',
+            'wallet_sufficient' => $walletBalance >= 10000,
+            'hold_limit_status' => $this->getHoldLimitStatus($user),
+            'team_value' => $teamValue,
+            'investment_amount' => $totalInvestment,
+            'max_hold_amount' => min($teamValue * 0.5, $totalInvestment * 10),
+            'used_hold_amount' => $this->getUsedHoldAmount($user),
         ];
     }
 
-    private function getRecentActivity(User $user): array
+    private function getUserPreferences(User $user): array
     {
-        return [
-            'recent_investments' => $user->investments()
-                ->with(['property', 'plot'])
-                ->orderBy('created_at', 'desc')
-                ->take(5)
-                ->get(),
-            'recent_profits' => $user->profits()
-                ->with(['sale.plot.property', 'investment'])
-                ->orderBy('created_at', 'desc')
-                ->take(5)
-                ->get(),
-            'recent_transactions' => $user->wallet->transactions()
-                ->orderBy('created_at', 'desc')
-                ->take(5)
-                ->get(),
+        // REQ-UD-014: Dashboard Personalization
+        return $user->dashboard_preferences ?? [
+            'widgets' => ['stats', 'projects', 'wallet', 'team'],
+            'theme' => 'light',
+            'layout' => 'grid',
         ];
+    }
+
+    private function checkProjectEligibility(User $user, PropertyProject $project): bool
+    {
+        if ($user->status !== 'active') {
+            return false;
+        }
+
+        $wallet = Wallet::where('user_id', $user->id)->first();
+        if (!$wallet || $wallet->balance < $project->price_per_plot) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function checkPlotEligibility(User $user, Plot $plot): bool
+    {
+        if ($user->status !== 'active') {
+            return false;
+        }
+
+        $wallet = Wallet::where('user_id', $user->id)->first();
+        if (!$wallet || $wallet->balance < $plot->price) {
+            return false;
+        }
+
+        $currentHolds = PlotHolding::where('user_id', $user->id)
+            ->where('hold_status', 'active')
+            ->count();
+
+        if ($currentHolds >= 5) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function getHoldLimitStatus(User $user): string
+    {
+        $teamValue = DB::table('investments')
+            ->join('team_members', 'investments.user_id', '=', 'team_members.user_id')
+            ->join('teams', 'team_members.team_id', '=', 'teams.id')
+            ->where('teams.team_leader_id', $user->id)
+            ->sum('investments.amount');
+
+        $totalInvestment = Investment::where('user_id', $user->id)
+            ->where('status', 'approved')
+            ->sum('amount');
+
+        $maxHoldAmount = min($teamValue * 0.5, $totalInvestment * 10);
+        $usedHoldAmount = $this->getUsedHoldAmount($user);
+
+        $percentage = $maxHoldAmount > 0 ? ($usedHoldAmount / $maxHoldAmount) * 100 : 0;
+
+        if ($percentage >= 90) {
+            return 'critical';
+        } elseif ($percentage >= 70) {
+            return 'warning';
+        } else {
+            return 'good';
+        }
+    }
+
+    private function getUsedHoldAmount(User $user): float
+    {
+        return PlotHolding::where('user_id', $user->id)
+            ->where('hold_status', 'active')
+            ->sum('hold_amount');
     }
 }

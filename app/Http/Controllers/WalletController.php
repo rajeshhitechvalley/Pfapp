@@ -394,6 +394,83 @@ class WalletController extends Controller
         }
     }
 
+    public function payRegistrationFee(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'payment_method_id' => 'required|exists:payment_methods,id',
+            'payment_mode' => 'required|in:upi,card,net_banking,wallet',
+            'payment_reference' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = auth()->user();
+        
+        // Check if registration fee is already paid
+        if ($user->registration_fee_paid >= 500) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration fee already paid'
+            ], 422);
+        }
+
+        $paymentMethod = PaymentMethod::findOrFail($request->payment_method_id);
+        $amount = 500;
+
+        try {
+            DB::beginTransaction();
+
+            // Create registration fee transaction
+            $transaction = Transaction::create([
+                'user_id' => $user->id,
+                'wallet_id' => $user->wallet->id,
+                'payment_method_id' => $paymentMethod->id,
+                'type' => 'registration_fee',
+                'amount' => $amount,
+                'processing_fee' => 0,
+                'net_amount' => $amount,
+                'balance_before' => $user->wallet->balance,
+                'balance_after' => $user->wallet->balance,
+                'reference' => 'REG_' . strtoupper(uniqid()),
+                'description' => 'Registration fee payment',
+                'payment_mode' => $request->payment_mode,
+                'payment_reference' => $request->payment_reference,
+                'status' => 'pending',
+            ]);
+
+            // Update user registration fee status
+            $user->update([
+                'registration_fee_paid' => $amount,
+                'registration_approved' => false, // Will be approved after payment confirmation
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Registration fee payment initiated successfully',
+                'data' => [
+                    'transaction' => $transaction,
+                    'user' => $user->fresh()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to process registration fee: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function getTransactionHistory(Request $request)
     {
         $user = auth()->user();

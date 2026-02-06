@@ -1,4 +1,5 @@
 import { Head } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import AdminLayout from '@/layouts/AdminLayout';
 import { 
     DollarSign, 
@@ -17,6 +18,39 @@ import {
     TrendingUp,
     BarChart3
 } from 'lucide-react';
+
+// Helper function to format currency with exactly 2 decimal places
+const formatCurrency = (amount: number | string | null | undefined): string => {
+    if (amount === null || amount === undefined || amount === '') {
+        return '₹0.00';
+    }
+    
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    
+    if (isNaN(numAmount)) {
+        return '₹0.00';
+    }
+    
+    return `₹${numAmount.toFixed(2)}`;
+};
+
+// Helper function to format currency with thousands separator
+const formatCurrencyWithSeparator = (amount: number | string | null | undefined): string => {
+    if (amount === null || amount === undefined || amount === '') {
+        return '₹0.00';
+    }
+    
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    
+    if (isNaN(numAmount)) {
+        return '₹0.00';
+    }
+    
+    return `₹${numAmount.toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    })}`;
+};
 
 interface WalletData {
     id: number;
@@ -54,10 +88,13 @@ export default function AdminWallets({ wallets }: AdminWalletsProps) {
                             <p className="text-sm text-gray-600 mt-1">Manage all user wallets and balances</p>
                         </div>
                         <div className="flex items-center space-x-3">
-                            <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200">
+                            <Link
+                                href="/admin/wallets/create"
+                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+                            >
                                 <Wallet className="h-4 w-4 mr-2" />
                                 Create Wallet
-                            </button>
+                            </Link>
                             <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200">
                                 <Download className="h-4 w-4 mr-2" />
                                 Export
@@ -87,7 +124,7 @@ export default function AdminWallets({ wallets }: AdminWalletsProps) {
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-600">Total Balance</p>
                                 <p className="text-2xl font-bold text-gray-900">
-                                    ₹{wallets.reduce((sum, wallet) => sum + wallet.balance, 0).toLocaleString()}
+                                    {formatCurrency(wallets.reduce((sum, wallet) => sum + wallet.balance, 0))}
                                 </p>
                             </div>
                         </div>
@@ -100,7 +137,7 @@ export default function AdminWallets({ wallets }: AdminWalletsProps) {
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-600">Total Deposits</p>
                                 <p className="text-2xl font-bold text-gray-900">
-                                    ₹{wallets.reduce((sum, wallet) => sum + wallet.total_deposits, 0).toLocaleString()}
+                                    {formatCurrency(wallets.reduce((sum, wallet) => sum + wallet.total_deposits, 0))}
                                 </p>
                             </div>
                         </div>
@@ -113,7 +150,7 @@ export default function AdminWallets({ wallets }: AdminWalletsProps) {
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-600">Total Investments</p>
                                 <p className="text-2xl font-bold text-gray-900">
-                                    ₹{wallets.reduce((sum, wallet) => sum + wallet.total_investments, 0).toLocaleString()}
+                                    {formatCurrency(wallets.reduce((sum, wallet) => sum + wallet.total_investments, 0))}
                                 </p>
                             </div>
                         </div>
@@ -188,7 +225,7 @@ export default function AdminWallets({ wallets }: AdminWalletsProps) {
                                                     <Wallet className="h-5 w-5 text-blue-600" />
                                                 </div>
                                                 <div className="ml-3">
-                                                    <div className="text-sm font-medium text-gray-900">₹{wallet.balance.toLocaleString()}</div>
+                                                    <div className="text-sm font-medium text-gray-900">{formatCurrency(wallet.balance)}</div>
                                                     <div className="text-xs text-gray-500">ID: #{wallet.id}</div>
                                                 </div>
                                             </div>
@@ -204,11 +241,11 @@ export default function AdminWallets({ wallets }: AdminWalletsProps) {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm text-gray-900">
-                                                <div className="font-medium">₹{wallet.total_deposits.toLocaleString()}</div>
+                                                <div className="font-medium">{formatCurrency(wallet.total_deposits)}</div>
                                                 <div className="text-xs text-gray-500">Deposits</div>
                                             </div>
                                             <div className="text-xs text-gray-500 mt-1">
-                                                ₹{wallet.total_investments.toLocaleString()} invested
+                                                {formatCurrency(wallet.total_investments)} invested
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -228,13 +265,29 @@ export default function AdminWallets({ wallets }: AdminWalletsProps) {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end space-x-2">
-                                                <button className="text-blue-600 hover:text-blue-900">
+                                                <Link
+                                                    href={`/admin/wallets/${wallet.id}`}
+                                                    className="text-blue-600 hover:text-blue-900"
+                                                    title="View Wallet"
+                                                >
                                                     <Eye className="h-4 w-4" />
-                                                </button>
-                                                <button className="text-green-600 hover:text-green-900">
+                                                </Link>
+                                                <Link
+                                                    href={`/admin/wallets/${wallet.id}/edit`}
+                                                    className="text-green-600 hover:text-green-900"
+                                                    title="Edit Wallet"
+                                                >
                                                     <Edit className="h-4 w-4" />
-                                                </button>
-                                                <button className="text-red-600 hover:text-red-900">
+                                                </Link>
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm(`Are you sure you want to delete ${wallet.user.name}'s wallet? This action cannot be undone.`)) {
+                                                            router.delete(`/admin/wallets/${wallet.id}`);
+                                                        }
+                                                    }}
+                                                    className="text-red-600 hover:text-red-900"
+                                                    title="Delete Wallet"
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>
                                             </div>

@@ -50,7 +50,7 @@ return new class extends Migration
             $table->index(['type', 'status']);
             $table->index(['city', 'state']);
             $table->index(['approval_status']);
-            $table->index(['legal_approval_status', 'government_approval_status']);
+            $table->index(['legal_approval_status', 'government_approval_status'], 'legal_gov_approval_idx');
         });
     }
 
