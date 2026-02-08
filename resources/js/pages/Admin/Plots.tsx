@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import AdminLayout from '@/layouts/AdminLayout';
 import { 
     Building,
@@ -20,7 +20,9 @@ import {
     Calendar,
     Grid3x3,
     List,
-    AlertTriangle
+    AlertTriangle,
+    Settings,
+    Plus
 } from 'lucide-react';
 
 interface PlotData {
@@ -88,10 +90,20 @@ export default function AdminPlots({ plots, pagination }: AdminPlotsProps) {
                             <p className="text-sm text-gray-600 mt-1">Manage all property plots</p>
                         </div>
                         <div className="flex items-center space-x-3">
-                            <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200">
-                                <Building className="h-4 w-4 mr-2" />
+                            <Link
+                                href="/admin/plots/features/create"
+                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
                                 New Plot
-                            </button>
+                            </Link>
+                            <Link
+                                href="/admin/plots/features"
+                                className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-200"
+                            >
+                                <Settings className="h-4 w-4 mr-2" />
+                                Plot Features
+                            </Link>
                             <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200">
                                 <Download className="h-4 w-4 mr-2" />
                                 Export

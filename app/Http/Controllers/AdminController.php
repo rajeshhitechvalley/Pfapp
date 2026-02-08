@@ -7,6 +7,7 @@ use App\Models\Team;
 use App\Models\Wallet;
 use App\Models\Investment;
 use App\Models\Property;
+use App\Models\PropertyProject;
 use App\Models\Plot;
 use App\Models\Transaction;
 use App\Models\Sale;
@@ -783,7 +784,7 @@ class AdminController extends Controller
 
     public function plots(): Response
     {
-        $plots = Plot::with(['property', 'sales', 'investment'])
+        $plots = Plot::with(['property', 'sale', 'investments'])
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
@@ -1484,5 +1485,221 @@ class AdminController extends Controller
 
         return redirect()->route('admin.wallets')
             ->with('success', 'Wallet deleted successfully!');
+    }
+
+    // Plot Features CRUD Methods
+    public function plotFeatures(): Response
+    {
+        $plots = Plot::with(['property'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        return Inertia::render('Admin/PlotFeatures/Index', [
+            'plots' => $plots->items(),
+            'pagination' => [
+                'current_page' => $plots->currentPage(),
+                'last_page' => $plots->lastPage(),
+                'per_page' => $plots->perPage(),
+                'total' => $plots->total(),
+                'from' => $plots->firstItem(),
+                'to' => $plots->lastItem(),
+            ]
+        ]);
+    }
+
+    public function createPlotFeature(): Response
+    {
+        $properties = \App\Models\Property::all();
+        
+        return Inertia::render('Admin/PlotFeatures/Create', [
+            'properties' => $properties,
+            'plotTypes' => ['residential', 'commercial', 'industrial', 'agricultural'],
+            'areaUnits' => ['sqft', 'sqm', 'acre', 'hectare'],
+            'facingDirections' => [
+                'N' => 'North',
+                'NE' => 'North-East',
+                'E' => 'East',
+                'SE' => 'South-East',
+                'S' => 'South',
+                'SW' => 'South-West',
+                'W' => 'West',
+                'NW' => 'North-West',
+            ],
+            'statuses' => ['available', 'held', 'sold', 'reserved'],
+        ]);
+    }
+
+    public function storePlotFeature(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'property_id' => 'nullable|exists:properties,id',
+            'plot_number' => 'required|string|max:255',
+            'area' => 'required|numeric|min:0',
+            'area_unit' => 'required|string|in:sqft,sqm,acre,hectare',
+            'price' => 'required|numeric|min:0',
+            'price_per_sqft' => 'nullable|numeric|min:0',
+            'plot_type' => 'required|string|in:residential,commercial,industrial,agricultural',
+            'road_facing' => 'boolean',
+            'status' => 'required|string|in:available,held,sold,reserved',
+            'description' => 'nullable|string|max:2000',
+            'features' => 'nullable|array',
+            'features.*' => 'string|max:255',
+            'dimensions' => 'nullable|string|max:255',
+            'length' => 'nullable|numeric|min:0',
+            'width' => 'nullable|numeric|min:0',
+            'location_details' => 'nullable|string|max:1000',
+            'facing_direction' => 'nullable|string|in:N,NE,E,SE,S,SW,W,NW',
+            'road_width' => 'nullable|numeric|min:0',
+            'corner_plot' => 'boolean',
+            'double_road' => 'boolean',
+            'location_coordinates' => 'nullable|string|max:255',
+            'nearby_amenities' => 'nullable|array',
+            'nearby_amenities.*' => 'string|max:255',
+            'soil_type' => 'nullable|string|max:255',
+            'topography' => 'nullable|string|max:255',
+            'legal_clearance' => 'nullable|string|max:255',
+            'development_charges' => 'nullable|numeric|min:0',
+            'maintenance_charges' => 'nullable|numeric|min:0',
+            'water_connection' => 'boolean',
+            'electricity_connection' => 'boolean',
+            'sewage_connection' => 'boolean',
+            'gas_connection' => 'boolean',
+            'internet_connection' => 'boolean',
+            'road_access' => 'nullable|string|max:255',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string|max:100',
+            'priority_level' => 'nullable|integer|min:1|max:10',
+            'featured_plot' => 'boolean',
+            'original_price' => 'nullable|numeric|min:0',
+            'discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'special_offer' => 'boolean',
+            'offer_expiry_date' => 'nullable|date|after:today',
+            'negotiable' => 'boolean',
+        ]);
+
+        // Set default property_id if not provided
+        if (!isset($validated['property_id']) || $validated['property_id'] === null) {
+            $validated['property_id'] = 1; // Default to first property
+        }
+
+        // Calculate price_per_sqft if not provided
+        if (!isset($validated['price_per_sqft']) || $validated['price_per_sqft'] === null) {
+            $area = $validated['area'];
+            $price = $validated['price'];
+            $areaUnit = $validated['area_unit'];
+            
+            // Convert to sqft for calculation
+            $areaInSqft = $area;
+            if ($areaUnit === 'sqm') {
+                $areaInSqft = $area * 10.764;
+            } elseif ($areaUnit === 'acre') {
+                $areaInSqft = $area * 43560;
+            } elseif ($areaUnit === 'hectare') {
+                $areaInSqft = $area * 107639;
+            }
+            
+            $validated['price_per_sqft'] = $areaInSqft > 0 ? round($price / $areaInSqft, 2) : 0;
+        }
+
+        Plot::create($validated);
+
+        return redirect()->route('admin.plots.features')
+            ->with('success', 'Plot created successfully!');
+    }
+
+    public function editPlotFeature($id): Response
+    {
+        $plot = Plot::with(['property'])->findOrFail($id);
+        $properties = \App\Models\Property::all();
+        
+        return Inertia::render('Admin/PlotFeatures/Edit', [
+            'plot' => $plot,
+            'properties' => $properties,
+            'plotTypes' => ['residential', 'commercial', 'industrial', 'agricultural'],
+            'areaUnits' => ['sqft', 'sqm', 'acre', 'hectare'],
+            'facingDirections' => [
+                'N' => 'North',
+                'NE' => 'North-East',
+                'E' => 'East',
+                'SE' => 'South-East',
+                'S' => 'South',
+                'SW' => 'South-West',
+                'W' => 'West',
+                'NW' => 'North-West',
+            ],
+            'statuses' => ['available', 'held', 'sold', 'reserved'],
+        ]);
+    }
+
+    public function updatePlotFeature(Request $request, $id): RedirectResponse
+    {
+        $plot = Plot::findOrFail($id);
+
+        $validated = $request->validate([
+            'property_id' => 'required|exists:properties,id',
+            'plot_number' => 'required|string|max:255',
+            'area' => 'required|numeric|min:0',
+            'area_unit' => 'required|string|in:sqft,sqm,acre,hectare',
+            'price' => 'required|numeric|min:0',
+            'price_per_sqft' => 'nullable|numeric|min:0',
+            'plot_type' => 'required|string|in:residential,commercial,industrial,agricultural',
+            'road_facing' => 'boolean',
+            'status' => 'required|string|in:available,held,sold,reserved',
+            'description' => 'nullable|string|max:2000',
+            'features' => 'nullable|array',
+            'features.*' => 'string|max:255',
+            'dimensions' => 'nullable|string|max:255',
+            'length' => 'nullable|numeric|min:0',
+            'width' => 'nullable|numeric|min:0',
+            'location_details' => 'nullable|string|max:1000',
+            'facing_direction' => 'nullable|string|in:N,NE,E,SE,S,SW,W,NW',
+            'road_width' => 'nullable|numeric|min:0',
+            'corner_plot' => 'boolean',
+            'double_road' => 'boolean',
+            'location_coordinates' => 'nullable|string|max:255',
+            'nearby_amenities' => 'nullable|array',
+            'nearby_amenities.*' => 'string|max:255',
+            'soil_type' => 'nullable|string|max:255',
+            'topography' => 'nullable|string|max:255',
+            'legal_clearance' => 'nullable|string|max:255',
+            'development_charges' => 'nullable|numeric|min:0',
+            'maintenance_charges' => 'nullable|numeric|min:0',
+            'water_connection' => 'boolean',
+            'electricity_connection' => 'boolean',
+            'sewage_connection' => 'boolean',
+            'gas_connection' => 'boolean',
+            'internet_connection' => 'boolean',
+            'road_access' => 'nullable|string|max:255',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string|max:100',
+            'priority_level' => 'nullable|integer|min:1|max:10',
+            'featured_plot' => 'boolean',
+            'original_price' => 'nullable|numeric|min:0',
+            'discount_percentage' => 'nullable|numeric|min:0|max:100',
+            'special_offer' => 'boolean',
+            'offer_expiry_date' => 'nullable|date|after:today',
+            'negotiable' => 'boolean',
+        ]);
+
+        $plot->update($validated);
+
+        return redirect()->route('admin.plots.features')
+            ->with('success', 'Plot updated successfully!');
+    }
+
+    public function destroyPlotFeature($id): RedirectResponse
+    {
+        $plot = Plot::findOrFail($id);
+        
+        // Check if plot has any related records
+        if ($plot->plotHoldings()->exists() || $plot->investments()->exists()) {
+            return redirect()->back()
+                ->with('error', 'Cannot delete plot. It has related holdings or investments.');
+        }
+
+        $plot->delete();
+
+        return redirect()->route('admin.plots.features')
+            ->with('success', 'Plot deleted successfully!');
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InvestmentController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -70,6 +71,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     Route::put('/properties/{id}/update', [AdminController::class, 'updateProperty'])->name('properties.update');
     Route::delete('/properties/{id}', [AdminController::class, 'destroyProperty'])->name('properties.destroy');
     Route::get('/plots', [AdminController::class, 'plots'])->name('plots');
+    
+    // Plot Features CRUD Routes
+    Route::get('/plots/features', [AdminController::class, 'plotFeatures'])->name('plots.features');
+    Route::get('/plots/features/create', [AdminController::class, 'createPlotFeature'])->name('plots.features.create');
+    Route::post('/plots/features/store', [AdminController::class, 'storePlotFeature'])->name('plots.features.store');
+    Route::get('/plots/features/{id}/edit', [AdminController::class, 'editPlotFeature'])->name('plots.features.edit');
+    Route::put('/plots/features/{id}/update', [AdminController::class, 'updatePlotFeature'])->name('plots.features.update');
+    Route::delete('/plots/features/{id}', [AdminController::class, 'destroyPlotFeature'])->name('plots.features.destroy');
+    
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
     Route::get('/audit', [AdminController::class, 'audit'])->name('audit');
     Route::get('/settings', [AdminController::class, 'settings'])->name('settings');

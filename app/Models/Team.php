@@ -24,6 +24,8 @@ class Team extends Model
         'notes',
     ];
 
+    protected $with = ['teamLeader', 'teamMembers'];
+
     protected function casts(): array
     {
         return [
@@ -82,14 +84,28 @@ class Team extends Model
         return $this->member_count >= 20 && $this->status !== 'active';
     }
 
+    public function toArray(): array
+    {
+        $array = parent::toArray();
+        
+        // Ensure teamMembers is always included, even if empty
+        if (!isset($array['team_members'])) {
+            $array['team_members'] = [];
+        }
+        
+        return $array;
+    }
+
     public function getFormattedTeamValue(): string
     {
-        return '₹' . number_format($this->team_value, 2);
+        $value = $this->team_value ?? 0;
+        return '₹' . number_format((float) $value, 2);
     }
 
     public function getFormattedTotalInvestments(): string
     {
-        return '₹' . number_format($this->total_investments, 2);
+        $value = $this->total_investments ?? 0;
+        return '₹' . number_format((float) $value, 2);
     }
 
     public function getActivationProgress(): array
@@ -128,8 +144,8 @@ class Team extends Model
             ->get()
             ->map(function ($member) {
                 return [
-                    'name' => $member->name,
-                    'email' => $member->email,
+                    'name' => $member->user->name,
+                    'email' => $member->user->email,
                     'total_investments' => $member->investments_sum_amount ?? 0,
                     'investment_count' => $member->investments()->count(),
                 ];

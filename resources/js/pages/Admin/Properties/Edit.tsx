@@ -89,13 +89,14 @@ export default function AdminPropertyEdit({ property, users }: AdminPropertyEdit
     const calculateTotals = () => {
         const totalPlots = parseInt(data.total_plots) || 0;
         const pricePerPlot = parseFloat(data.price_per_plot) || 0;
+        const purchaseCost = parseFloat(data.purchase_cost) || 0;
         const developmentCost = parseFloat(data.development_cost) || 0;
         const legalCost = parseFloat(data.legal_cost) || 0;
         const marketingCost = parseFloat(data.marketing_cost) || 0;
         const infrastructureCost = parseFloat(data.infrastructure_cost) || 0;
         
         const totalValue = totalPlots * pricePerPlot;
-        const totalCost = developmentCost + legalCost + marketingCost + infrastructureCost;
+        const totalCost = purchaseCost + developmentCost + legalCost + marketingCost + infrastructureCost;
         
         return { totalValue, totalCost };
     };
@@ -108,7 +109,7 @@ export default function AdminPropertyEdit({ property, users }: AdminPropertyEdit
         const formData = {
             ...data,
             total_plots: parseInt(data.total_plots) || 0,
-            available_plots: parseInt(data.total_plots) - property.sold_plots,
+            available_plots: parseInt(data.total_plots) || 0,
             total_area: parseFloat(data.total_area) || 0,
             price_per_plot: parseFloat(data.price_per_plot) || 0,
             total_value: totalValue,
@@ -468,6 +469,7 @@ export default function AdminPropertyEdit({ property, users }: AdminPropertyEdit
                                     <p className="mt-1 text-sm text-red-600">{errors.status}</p>
                                 )}
                             </div>
+                        </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
