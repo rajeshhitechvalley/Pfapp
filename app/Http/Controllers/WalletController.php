@@ -57,7 +57,7 @@ class WalletController extends Controller
                     'wallet' => $wallet,
                     'transactions' => $transactions,
                     'summary' => $summary,
-                    'payment_methods' => $paymentMethods
+                    'paymentMethods' => $paymentMethods
                 ]
             ]);
         }
@@ -77,10 +77,8 @@ class WalletController extends Controller
         $wallet = $user->wallet;
         
         if (!$wallet) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Wallet not found'
-            ], 404);
+            return redirect()->route('dashboard')
+                ->with('error', 'Wallet not found');
         }
 
         $transaction = $wallet->transactions()
@@ -99,6 +97,18 @@ class WalletController extends Controller
         ]);
     }
 
+    public function depositPage(Request $request)
+    {
+        $user = auth()->user();
+        $wallet = $user->wallet;
+        $paymentMethods = PaymentMethod::active()->get();
+
+        return Inertia::render('Wallet/Deposit', [
+            'wallet' => $wallet,
+            'paymentMethods' => $paymentMethods,
+        ]);
+    }
+
     public function deposit(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -111,11 +121,9 @@ class WalletController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
         }
 
         $user = auth()->user();
@@ -142,11 +150,11 @@ class WalletController extends Controller
                 'wallet_id' => $wallet->id,
                 'payment_method_id' => $paymentMethod->id,
                 'type' => 'deposit',
-                'amount' => $request->amount,
+                'amount' => (float) $request->amount,
                 'processing_fee' => $processingFee,
                 'net_amount' => $netAmount,
                 'balance_before' => $wallet->balance,
-                'balance_after' => $wallet->balance + $netAmount,
+                'balance_after' => $wallet->balance + (float) $netAmount,
                 'reference' => 'DEP_' . strtoupper(uniqid()),
                 'description' => $request->notes ?: 'Deposit via ' . $paymentMethod->name,
                 'payment_mode' => $request->payment_mode,
@@ -166,14 +174,8 @@ class WalletController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Deposit request submitted successfully',
-                'data' => [
-                    'transaction' => $transaction,
-                    'wallet' => $wallet->fresh()
-                ]
-            ]);
+            return redirect()->route('wallet')
+                ->with('success', 'Deposit request submitted successfully');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -183,6 +185,16 @@ class WalletController extends Controller
                 'message' => 'Failed to process deposit: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function withdrawPage(Request $request)
+    {
+        $user = auth()->user();
+        $wallet = $user->wallet;
+
+        return Inertia::render('Wallet/Withdraw', [
+            'wallet' => $wallet,
+        ]);
     }
 
     public function withdraw(Request $request)
@@ -197,11 +209,9 @@ class WalletController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
         }
 
         $user = auth()->user();
@@ -231,7 +241,7 @@ class WalletController extends Controller
             DB::beginTransaction();
 
             // Freeze the amount
-            $wallet->freezeAmount($request->amount);
+            $wallet->freezeAmount((float) $request->amount);
 
             // Create transaction record
             $transaction = Transaction::create([
@@ -239,11 +249,11 @@ class WalletController extends Controller
                 'wallet_id' => $wallet->id,
                 'payment_method_id' => $paymentMethod->id,
                 'type' => 'withdrawal',
-                'amount' => $request->amount,
+                'amount' => (float) $request->amount,
                 'processing_fee' => $processingFee,
                 'net_amount' => $netAmount,
                 'balance_before' => $wallet->balance,
-                'balance_after' => $wallet->balance - $request->amount,
+                'balance_after' => $wallet->balance - (float) $netAmount,
                 'reference' => 'WTH_' . strtoupper(uniqid()),
                 'description' => $request->notes ?: 'Withdrawal via ' . $paymentMethod->name,
                 'payment_mode' => $request->payment_mode,
@@ -258,14 +268,8 @@ class WalletController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Withdrawal request submitted successfully',
-                'data' => [
-                    'transaction' => $transaction,
-                    'wallet' => $wallet->fresh()
-                ]
-            ]);
+            return redirect()->route('wallet')
+                ->with('success', 'Withdrawal request submitted successfully');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -289,19 +293,6 @@ class WalletController extends Controller
         }
 
         try {
-            DB::beginTransaction();
-
-            $wallet = $transaction->wallet;
-
-            if ($transaction->type === 'deposit') {
-                // Remove from pending and add to balance
-                $wallet->removePendingAmount($transaction->net_amount);
-                $wallet->addBalance($transaction->net_amount);
-            } elseif ($transaction->type === 'withdrawal') {
-                // Unfreeze and deduct from balance
-                $wallet->unfreezeAmount($transaction->amount);
-                $wallet->deductBalance($transaction->amount);
-            }
 
             $transaction->update([
                 'status' => 'completed',
@@ -510,10 +501,8 @@ class WalletController extends Controller
         $wallet = $user->wallet;
         
         if (!$wallet) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Wallet not found'
-            ], 404);
+            return redirect()->route('dashboard')
+                ->with('error', 'Wallet not found');
         }
 
         $summary = $wallet->getTransactionSummary();

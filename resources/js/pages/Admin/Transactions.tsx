@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import AdminLayout from '@/layouts/AdminLayout';
+import AdminLayout from '@/layouts/admin-layout';
 import { 
     DollarSign, 
     TrendingUp, 

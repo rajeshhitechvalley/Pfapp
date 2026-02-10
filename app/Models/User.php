@@ -239,4 +239,9 @@ class User extends Authenticatable
             default => 'gray',
         };
     }
+
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
 }

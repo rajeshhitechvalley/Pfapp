@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { Search, Plus, Edit, Trash2, Eye, Users, UserPlus, UserCheck } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
 
 interface TeamMember {
     id: number;
@@ -74,7 +75,7 @@ export default function TeamsIndex({ teams, filters }: TeamsIndexProps) {
     };
 
     return (
-        <>
+        <AppLayout>
             <Head title="Teams" />
             
             <div className="py-12">
@@ -244,6 +245,6 @@ export default function TeamsIndex({ teams, filters }: TeamsIndexProps) {
                     </div>
                 </div>
             </div>
-        </>
+        </AppLayout>
     );
 }

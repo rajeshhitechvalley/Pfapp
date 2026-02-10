@@ -121,7 +121,7 @@ class DashboardController extends Controller
                 return [
                     'id' => $plot->id,
                     'plot_number' => $plot->plot_number,
-                    'project_name' => $plot->project->name,
+                    'project_name' => $plot->project?->name ?? 'N/A',
                     'area' => $plot->area,
                     'area_unit' => $plot->area_unit,
                     'price' => $plot->price,
@@ -244,7 +244,7 @@ class DashboardController extends Controller
                     'progress' => $project->total_plots > 0 
                         ? (($project->total_plots - $project->available_plots) / $project->total_plots) * 100 
                         : 0,
-                    'eligible' => $this->checkProjectEligibility($user, $project),
+                    'eligible' => $project instanceof PropertyProject ? $this->checkProjectEligibility($user, $project) : false,
                 ];
             });
 
@@ -264,7 +264,7 @@ class DashboardController extends Controller
                 return [
                     'id' => $plot->id,
                     'plot_number' => $plot->plot_number,
-                    'project_name' => $plot->project->name,
+                    'project_name' => $plot->project?->name ?? 'N/A',
                     'area' => $plot->area,
                     'area_unit' => $plot->area_unit,
                     'price' => $plot->price,
@@ -275,7 +275,7 @@ class DashboardController extends Controller
                     'is_corner' => $plot->corner_plot,
                     'is_double_road' => $plot->double_road,
                     'features' => $plot->features,
-                    'eligible' => $this->checkPlotEligibility($user, $plot),
+                    'eligible' => $plot instanceof Plot ? $this->checkPlotEligibility($user, $plot) : false,
                 ];
             });
 
@@ -367,12 +367,17 @@ class DashboardController extends Controller
     {
         // REQ-UD-008: Team Summary Display
         $teamMembers = Team::where('team_leader_id', $user->id)
-            ->with('member')
+            ->with('teamMembers.user')
             ->get();
 
-        $teamSize = $teamMembers->count();
-        $teamValue = $teamMembers->sum(function ($member) {
-            return $member->member->total_investment ?? 0;
+        $teamSize = $teamMembers->flatMap(function ($team) {
+            return $team->teamMembers;
+        })->count();
+        
+        $teamValue = $teamMembers->flatMap(function ($team) {
+            return $team->teamMembers;
+        })->sum(function ($member) {
+            return $member->user->investments()->sum('amount') ?? 0;
         });
 
         $referralCount = User::where('referred_by', $user->id)->count();
@@ -384,15 +389,17 @@ class DashboardController extends Controller
             'referral_count' => $referralCount,
             'referral_link' => $referralLink,
             'progress_percentage' => ($teamSize / 20) * 100,
-            'members' => $teamMembers->map(function ($member) {
-                return [
-                    'id' => $member->id,
-                    'name' => $member->member->name,
-                    'email' => $member->member->email,
-                    'role' => $member->role,
-                    'status' => $member->member->status,
-                    'avatar' => $member->member->avatar,
-                ];
+            'members' => $teamMembers->flatMap(function ($team) {
+                return $team->teamMembers->map(function ($member) {
+                    return [
+                        'id' => $member->id,
+                        'name' => $member->user->name,
+                        'email' => $member->user->email,
+                        'role' => $member->role,
+                        'status' => $member->user->status,
+                        'avatar' => $member->user->avatar,
+                    ];
+                });
             }),
         ];
     }

@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { 
     BookOpen, 
     Folder, 
@@ -18,7 +18,7 @@ import {
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
-import {
+import { 
     Sidebar,
     SidebarContent,
     SidebarFooter,
@@ -28,6 +28,7 @@ import {
     SidebarMenuItem,
     SidebarGroup,
     SidebarGroupLabel,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
@@ -40,64 +41,29 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
-        title: 'Properties',
-        href: '/admin/properties',
-        icon: Building,
-    },
-    {
-        title: 'Plots',
-        href: '/admin/plots',
-        icon: Landmark,
-    },
-    {
-        title: 'Users',
-        href: '/admin/users',
-        icon: Users,
-    },
-    {
-        title: 'Teams',
-        href: '/admin/teams',
+        title: 'Profile',
+        href: '/profile',
         icon: Users,
     },
     {
         title: 'Investments',
-        href: '/admin/investments',
+        href: '/investment',
         icon: TrendingUp,
     },
     {
-        title: 'Transactions',
-        href: '/admin/transactions',
+        title: 'Wallet',
+        href: '/wallet',
         icon: Wallet,
     },
     {
-        title: 'Sales',
-        href: '/admin/sales',
-        icon: FileText,
+        title: 'Teams',
+        href: '/teams',
+        icon: Users,
     },
     {
-        title: 'Profits',
-        href: '/admin/profits',
-        icon: PieChart,
-    },
-    {
-        title: 'Wallets',
-        href: '/admin/wallets',
-        icon: Wallet,
-    },
-    {
-        title: 'Reports',
-        href: '/admin/reports',
-        icon: FileText,
-    },
-    {
-        title: 'Audit',
-        href: '/admin/audit',
-        icon: Shield,
-    },
-    {
-        title: 'Settings',
-        href: '/admin/settings',
-        icon: Settings,
+        title: 'Properties',
+        href: '/investment/dashboard',
+        icon: Building,
     },
 ];
 
@@ -120,6 +86,8 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { auth } = usePage().props;
+    
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -138,45 +106,7 @@ export function AppSidebar() {
                 <SidebarGroup>
                     <SidebarGroupLabel>Main</SidebarGroupLabel>
                     <SidebarMenu>
-                        {mainNavItems.slice(0, 6).map((item) => (
-                            <SidebarMenuItem key={item.title}>
-                                <SidebarMenuButton
-                                    asChild
-                                    tooltip={{ children: item.title }}
-                                >
-                                    <Link href={item.href} prefetch>
-                                        {item.icon && <item.icon />}
-                                        <span>{item.title}</span>
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                        ))}
-                    </SidebarMenu>
-                </SidebarGroup>
-
-                <SidebarGroup>
-                    <SidebarGroupLabel>Management</SidebarGroupLabel>
-                    <SidebarMenu>
-                        {mainNavItems.slice(6, 12).map((item) => (
-                            <SidebarMenuItem key={item.title}>
-                                <SidebarMenuButton
-                                    asChild
-                                    tooltip={{ children: item.title }}
-                                >
-                                    <Link href={item.href} prefetch>
-                                        {item.icon && <item.icon />}
-                                        <span>{item.title}</span>
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                        ))}
-                    </SidebarMenu>
-                </SidebarGroup>
-
-                <SidebarGroup>
-                    <SidebarGroupLabel>System</SidebarGroupLabel>
-                    <SidebarMenu>
-                        {mainNavItems.slice(12).map((item) => (
+                        {mainNavItems.map((item) => (
                             <SidebarMenuItem key={item.title}>
                                 <SidebarMenuButton
                                     asChild
@@ -195,7 +125,7 @@ export function AppSidebar() {
 
             <SidebarFooter>
                 <NavFooter items={footerNavItems} className="mt-auto" />
-                <NavUser />
+                <NavUser user={auth.user} />
             </SidebarFooter>
         </Sidebar>
     );

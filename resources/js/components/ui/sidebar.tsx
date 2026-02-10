@@ -162,7 +162,13 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const context = React.useContext(SidebarContext)
+  
+  if (!context) {
+    throw new Error("Sidebar must be used within a SidebarProvider.")
+  }
+
+  const { isMobile, state, openMobile, setOpenMobile } = context
 
   if (collapsible === "none") {
     return (
@@ -725,4 +731,5 @@ export {
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,
+  SidebarContext,
 }

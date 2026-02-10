@@ -4,23 +4,28 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Team;
-use App\Models\Wallet;
+use App\Models\TeamMember;
 use App\Models\Investment;
 use App\Models\Property;
 use App\Models\PropertyProject;
 use App\Models\Plot;
-use App\Models\Transaction;
 use App\Models\Sale;
 use App\Models\Profit;
+use App\Models\Transaction;
+use App\Models\Wallet;
+use App\Models\AdminConfiguration;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
-use Inertia\Response;
+use Inertia\Response as InertiaResponse;
 
 class AdminController extends Controller
 {
-    public function dashboard(): Response
+    public function dashboard(): InertiaResponse
     {
         // Get dashboard statistics
         $stats = [
@@ -102,7 +107,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function users(): Response
+    public function users(): InertiaResponse
     {
         $users = User::with(['wallet', 'ledTeam', 'teamMemberships'])
             ->orderBy('created_at', 'desc')
@@ -121,7 +126,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function teams(): Response
+    public function teams(): InertiaResponse
     {
         $teams = Team::with(['teamLeader', 'teamMembers.user'])
             ->withCount(['teamMembers'])
@@ -170,7 +175,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function showTeam($id): Response
+    public function showTeam($id): InertiaResponse
     {
         $team = Team::with(['teamLeader', 'teamMembers.user'])
             ->withCount(['teamMembers'])
@@ -212,7 +217,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function editTeam($id): Response
+    public function editTeam($id): InertiaResponse
     {
         $team = Team::with(['teamLeader', 'teamMembers.user'])
             ->withCount(['teamMembers'])
@@ -304,7 +309,7 @@ class AdminController extends Controller
         return redirect()->back()->with('success', 'Member status updated successfully');
     }
 
-    public function investments(): Response
+    public function investments(): InertiaResponse
     {
         $investments = Investment::with(['user', 'property', 'plot'])
             ->orderBy('created_at', 'desc')
@@ -323,7 +328,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function transactions(): Response
+    public function transactions(): InertiaResponse
     {
         $transactions = Transaction::with(['user', 'wallet', 'investment'])
             ->orderBy('created_at', 'desc')
@@ -705,7 +710,7 @@ class AdminController extends Controller
             ->with('success', 'Property deleted successfully!');
     }
 
-    public function sales(): Response
+    public function sales(): InertiaResponse
     {
         $sales = Sale::with(['plot.property', 'initiator'])
             ->orderBy('created_at', 'desc')
@@ -724,7 +729,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function profits(): Response
+    public function profits(): InertiaResponse
     {
         $profits = Profit::with(['user', 'sale.plot.property', 'investment'])
             ->orderBy('created_at', 'desc')
@@ -743,7 +748,241 @@ class AdminController extends Controller
         ]);
     }
 
-    public function wallets(): Response
+    public function createProfit(): InertiaResponse
+    {
+        $users = User::orderBy('name')->get(['id', 'name', 'email']);
+        $investments = Investment::with(['user', 'property'])
+            ->where('status', 'active')
+            ->orderBy('created_at', 'desc')
+            ->get();
+        $sales = Sale::with(['plot', 'user'])
+            ->where('status', 'completed')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return Inertia::render('Admin/Profits/Create', [
+            'users' => $users,
+            'investments' => $investments,
+            'sales' => $sales,
+        ]);
+    }
+
+    public function storeProfit(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'investment_id' => 'nullable|exists:investments,id',
+            'sale_id' => 'nullable|exists:sales,id',
+            'total_profit' => 'required|numeric|min:0',
+            'company_percentage' => 'required|numeric|min:0|max:100',
+            'profit_percentage' => 'required|numeric|min:0|max:100',
+            'status' => 'required|in:pending,distributed,cancelled',
+            'calculation_date' => 'required|date',
+            'distribution_date' => 'nullable|date',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $validated['company_share'] = $validated['total_profit'] * ($validated['company_percentage'] / 100);
+        $validated['investor_share'] = $validated['total_profit'] - $validated['company_share'];
+        $validated['calculated_by'] = Auth::id();
+
+        $profit = Profit::create($validated);
+
+        return redirect()->route('profits.show', $profit->id)
+            ->with('success', 'Profit record created successfully.');
+    }
+
+    public function showProfit(int $id): InertiaResponse
+    {
+        $profit = Profit::with(['user', 'investment.property', 'sale.plot.property'])
+            ->findOrFail($id);
+
+        return Inertia::render('Admin/Profits/Show', [
+            'profit' => $profit,
+        ]);
+    }
+
+    public function editProfit(int $id): InertiaResponse
+    {
+        $profit = Profit::findOrFail($id);
+        $users = User::orderBy('name')->get(['id', 'name', 'email']);
+        $investments = Investment::with(['user', 'property'])
+            ->where('status', 'active')
+            ->orderBy('created_at', 'desc')
+            ->get();
+        $sales = Sale::with(['plot', 'user'])
+            ->where('status', 'completed')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return Inertia::render('Admin/Profits/Edit', [
+            'profit' => $profit,
+            'users' => $users,
+            'investments' => $investments,
+            'sales' => $sales,
+        ]);
+    }
+
+    public function updateProfit(Request $request, int $id): RedirectResponse
+    {
+        $profit = Profit::findOrFail($id);
+
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'investment_id' => 'nullable|exists:investments,id',
+            'sale_id' => 'nullable|exists:sales,id',
+            'total_profit' => 'required|numeric|min:0',
+            'company_percentage' => 'required|numeric|min:0|max:100',
+            'profit_percentage' => 'required|numeric|min:0|max:100',
+            'status' => 'required|in:pending,distributed,cancelled',
+            'calculation_date' => 'required|date',
+            'distribution_date' => 'nullable|date',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $validated['company_share'] = $validated['total_profit'] * ($validated['company_percentage'] / 100);
+        $validated['investor_share'] = $validated['total_profit'] - $validated['company_share'];
+
+        $profit->update($validated);
+
+        return redirect()->route('profits.show', $profit->id)
+            ->with('success', 'Profit record updated successfully.');
+    }
+
+    public function destroyProfit(int $id): RedirectResponse
+    {
+        $profit = Profit::findOrFail($id);
+        
+        if ($profit->status === 'distributed') {
+            return redirect()->route('profits.index')
+                ->with('error', 'Cannot delete distributed profit records.');
+        }
+
+        $profit->delete();
+
+        return redirect()->route('profits.index')
+            ->with('success', 'Profit record deleted successfully.');
+    }
+
+    public function distributeProfit(int $id): RedirectResponse
+    {
+        $profit = Profit::findOrFail($id);
+
+        if ($profit->status === 'distributed') {
+            return redirect()->route('profits.show', $profit->id)
+                ->with('error', 'Profit already distributed.');
+        }
+
+        // Add to user's wallet
+        $wallet = Wallet::where('user_id', $profit->user_id)->first();
+        if ($wallet) {
+            $wallet->addBalance((float) $profit->investor_share, 'profit');
+        }
+
+        $profit->update([
+            'status' => 'distributed',
+            'distribution_date' => now(),
+        ]);
+
+        return redirect()->route('profits.show', $profit->id)
+            ->with('success', 'Profit distributed successfully.');
+    }
+
+    public function distributeProfitsBulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'profit_ids' => 'required|array',
+            'profit_ids.*' => 'exists:profits,id',
+        ]);
+
+        $distributedCount = 0;
+        $failedCount = 0;
+
+        foreach ($validated['profit_ids'] as $profitId) {
+            $profit = Profit::find($profitId);
+            
+            if ($profit && $profit->status !== 'distributed') {
+                $wallet = Wallet::where('user_id', $profit->user_id)->first();
+                if ($wallet) {
+                    $wallet->addBalance((float) $profit->investor_share, 'profit');
+                    $profit->update([
+                        'status' => 'distributed',
+                        'distribution_date' => now(),
+                    ]);
+                    $distributedCount++;
+                } else {
+                    $failedCount++;
+                }
+            } else {
+                $failedCount++;
+            }
+        }
+
+        return redirect()->route('profits.index')
+            ->with('success', "Successfully distributed {$distributedCount} profits. Failed: {$failedCount}");
+    }
+
+    public function security(): InertiaResponse
+    {
+        // Get security settings and logs
+        $securityLogs = $this->getSecurityAuditLogs();
+        $securitySettings = $this->getSecuritySettings();
+        $failedLogins = $this->getFailedLogins();
+        $activeSessions = $this->getActiveSessions();
+
+        return Inertia::render('Admin/Security', [
+            'securityLogs' => $securityLogs,
+            'securitySettings' => $securitySettings,
+            'failedLogins' => $failedLogins,
+            'activeSessions' => $activeSessions,
+        ]);
+    }
+
+    private function getFailedLogins(): array
+    {
+        // Get recent failed login attempts
+        return [
+            'count_24h' => 0, // Placeholder
+            'count_7d' => 0,  // Placeholder
+            'recent_attempts' => [], // Placeholder
+        ];
+    }
+
+    private function getActiveSessions(): array
+    {
+        // Get active user sessions
+        return [
+            'total' => 0, // Placeholder
+            'users' => [], // Placeholder
+        ];
+    }
+
+    private function getSecuritySettings(): array
+    {
+        // Get security configuration
+        return [
+            'password_policy' => [
+                'min_length' => 8,
+                'require_uppercase' => true,
+                'require_lowercase' => true,
+                'require_numbers' => true,
+                'require_symbols' => false,
+            ],
+            'session_timeout' => 120, // minutes
+            'max_login_attempts' => 5,
+            'lockout_duration' => 15, // minutes
+        ];
+    }
+
+    private function getSecurityAuditLogs(): array
+    {
+        // Get security-related audit logs
+        // For now, return empty array as placeholder
+        // In a real implementation, this would query a security_logs table
+        return [];
+    }
+
+    public function wallets(): InertiaResponse
     {
         $wallets = Wallet::with(['user'])
             ->orderBy('created_at', 'desc')
@@ -762,7 +1001,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function properties(): Response
+    public function properties(): InertiaResponse
     {
         $properties = Property::with(['plots', 'sales'])
             ->withCount(['plots', 'sales'])
@@ -782,7 +1021,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function plots(): Response
+    public function plots(): InertiaResponse
     {
         $plots = Plot::with(['property', 'sale', 'investments'])
             ->orderBy('created_at', 'desc')
@@ -801,7 +1040,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function reports(): Response
+    public function reports(): InertiaResponse
     {
         // Get comprehensive report data
         $reports = [
@@ -1036,7 +1275,7 @@ class AdminController extends Controller
         return redirect()->back()->with('success', 'Member added successfully!');
     }
 
-    public function addTeamMembers(Request $request, $id): Response|RedirectResponse
+    public function addTeamMembers(Request $request, $id): InertiaResponse|RedirectResponse
     {
         $team = Team::with(['teamLeader', 'teamMembers.user'])
             ->withCount(['teamMembers'])
@@ -1258,7 +1497,7 @@ class AdminController extends Controller
         ];
     }
 
-    public function audit(): Response
+    public function audit(): InertiaResponse
     {
         // Get audit trail data
         $auditData = [
@@ -1351,7 +1590,7 @@ class AdminController extends Controller
         return [];
     }
 
-    public function settings(): Response
+    public function settings(): InertiaResponse
     {
         // Get system settings
         $settings = [

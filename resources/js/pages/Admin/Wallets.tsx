@@ -1,6 +1,6 @@
 import { Head } from '@inertiajs/react';
 import { Link, router } from '@inertiajs/react';
-import AdminLayout from '@/layouts/AdminLayout';
+import AdminLayout from '@/layouts/admin-layout';
 import { 
     DollarSign, 
     Wallet, 

@@ -46,10 +46,8 @@ class TeamController extends Controller
         
         // Check if user can create team
         if (!$user->canCreateTeam()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You cannot create a team. You may already have a team or your account is not active.'
-            ], 422);
+            return redirect()->back()
+                ->with('error', 'You cannot create a team. You may already have a team or your account is not active.');
         }
 
         $validator = Validator::make($request->all(), [
@@ -58,11 +56,9 @@ class TeamController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
         }
 
         $team = Team::create([

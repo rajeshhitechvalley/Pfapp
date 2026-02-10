@@ -42,6 +42,24 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'errors' => function () use ($request) {
+                return $this->resolveValidationErrors($request);
+            },
         ];
+    }
+
+    /**
+     * Resolves and prepares validation errors from the session.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return array
+     */
+    public function resolveValidationErrors(Request $request)
+    {
+        if ($request->session()->has('errors')) {
+            return $request->session()->get('errors')->toArray();
+        }
+
+        return [];
     }
 }

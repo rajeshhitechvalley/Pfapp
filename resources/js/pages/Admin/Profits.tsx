@@ -1,5 +1,5 @@
-import { Head } from '@inertiajs/react';
-import AdminLayout from '@/layouts/AdminLayout';
+import { Head, Link, router } from '@inertiajs/react';
+import AdminLayout from '@/layouts/admin-layout';
 import { 
     DollarSign, 
     TrendingUp, 
@@ -16,8 +16,20 @@ import {
     User,
     Building,
     Target,
-    BarChart3
+    BarChart3,
+    Plus
 } from 'lucide-react';
+import { useState } from 'react';
+
+// Define route helper function
+const route = (name: string, params?: any) => {
+    const baseUrl = window.location.origin;
+    if (name === 'profits.create') return `${baseUrl}/admin/profits/create`;
+    if (name === 'profits.show') return `${baseUrl}/admin/profits/${params}`;
+    if (name === 'profits.edit') return `${baseUrl}/admin/profits/${params}/edit`;
+    if (name === 'profits.index') return `${baseUrl}/admin/profits`;
+    return `${baseUrl}/admin/${name}`;
+};
 
 interface ProfitData {
     id: number;
@@ -27,9 +39,11 @@ interface ProfitData {
     investor_share: number;
     company_share: number;
     total_profit: number;
-    profit_rate: number;
-    distribution_date: string;
+    profit_percentage: number;
+    company_percentage: number;
     status: string;
+    distribution_date: string;
+    calculation_date: string;
     user: {
         id: number;
         name: string;
@@ -61,6 +75,61 @@ interface AdminProfitsProps {
 
 export default function AdminProfits({ profits, pagination }: AdminProfitsProps) {
     const profitsArray = Array.isArray(profits) ? profits : [];
+    const [selectedProfits, setSelectedProfits] = useState<number[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            setSelectedProfits(profitsArray.map(profit => profit.id));
+        } else {
+            setSelectedProfits([]);
+        }
+    };
+
+    const handleSelectProfit = (profitId: number, checked: boolean) => {
+        if (checked) {
+            setSelectedProfits([...selectedProfits, profitId]);
+        } else {
+            setSelectedProfits(selectedProfits.filter(id => id !== profitId));
+        }
+    };
+
+    const handleDistributeBulk = () => {
+        if (selectedProfits.length === 0) {
+            alert('Please select at least one profit to distribute.');
+            return;
+        }
+
+        if (confirm(`Are you sure you want to distribute ${selectedProfits.length} profit(s)?`)) {
+            router.post('/admin/profits/distribute-bulk', {
+                profit_ids: selectedProfits
+            }, {
+                onSuccess: () => setSelectedProfits([]),
+            });
+        }
+    };
+
+    const handleDelete = (profitId: number) => {
+        if (confirm('Are you sure you want to delete this profit record?')) {
+            router.delete(`/admin/profits/${profitId}`);
+        }
+    };
+
+    const handleDistribute = (profitId: number) => {
+        if (confirm('Are you sure you want to distribute this profit?')) {
+            router.post(`/admin/profits/${profitId}/distribute`);
+        }
+    };
+
+    const filteredProfits = profitsArray.filter(profit => {
+        const matchesSearch = profit.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            profit.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            profit.id.toString().includes(searchTerm);
+        const matchesStatus = !statusFilter || profit.status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
+
     return (
         <AdminLayout title="Profit Management">
             <Head title="Profits - Admin" />
@@ -74,11 +143,23 @@ export default function AdminProfits({ profits, pagination }: AdminProfitsProps)
                             <p className="text-sm text-gray-600 mt-1">Manage profit distribution and calculations</p>
                         </div>
                         <div className="flex items-center space-x-3">
-                            <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200">
-                                <DollarSign className="h-4 w-4 mr-2" />
-                                Distribute Profits
-                            </button>
-                            <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200">
+                            <Link
+                                href={route('profits.create')}
+                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Create Profit
+                            </Link>
+                            {selectedProfits.length > 0 && (
+                                <button
+                                    onClick={handleDistributeBulk}
+                                    className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-200"
+                                >
+                                    <CheckCircle className="h-4 w-4 mr-2" />
+                                    Distribute Selected ({selectedProfits.length})
+                                </button>
+                            )}
+                            <button className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200">
                                 <Download className="h-4 w-4 mr-2" />
                                 Export
                             </button>
@@ -133,7 +214,7 @@ export default function AdminProfits({ profits, pagination }: AdminProfitsProps)
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-600">Avg Profit Rate</p>
                                 <p className="text-2xl font-bold text-gray-900">
-                                    {profitsArray.length > 0 ? (profitsArray.reduce((sum, profit) => sum + profit.profit_rate, 0) / profitsArray.length).toFixed(2) : '0'}%
+                                    {profitsArray.length > 0 ? (profitsArray.reduce((sum, profit) => sum + profit.profit_percentage, 0) / profitsArray.length).toFixed(2) : '0'}%
                                 </p>
                             </div>
                         </div>
@@ -148,10 +229,16 @@ export default function AdminProfits({ profits, pagination }: AdminProfitsProps)
                             <input
                                 type="text"
                                 placeholder="Search profits..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
                                 className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                             />
                         </div>
-                        <select className="px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <select 
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        >
                             <option value="">All Status</option>
                             <option value="pending">Pending</option>
                             <option value="distributed">Distributed</option>
@@ -173,6 +260,14 @@ export default function AdminProfits({ profits, pagination }: AdminProfitsProps)
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
+                                    <th className="px-6 py-3 text-left">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedProfits.length === filteredProfits.length && filteredProfits.length > 0}
+                                            onChange={(e) => handleSelectAll(e.target.checked)}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                    </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Profit
                                     </th>
@@ -203,8 +298,16 @@ export default function AdminProfits({ profits, pagination }: AdminProfitsProps)
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {profitsArray.map((profit) => (
+                                {filteredProfits.map((profit) => (
                                     <tr key={profit.id} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedProfits.includes(profit.id)}
+                                                onChange={(e) => handleSelectProfit(profit.id, e.target.checked)}
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div>
                                                 <div className="text-sm font-medium text-gray-900">₹{profit.total_profit.toLocaleString()}</div>
@@ -237,7 +340,7 @@ export default function AdminProfits({ profits, pagination }: AdminProfitsProps)
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm text-gray-900">
-                                                {profit.profit_rate}%
+                                                {profit.profit_percentage}%
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -252,20 +355,43 @@ export default function AdminProfits({ profits, pagination }: AdminProfitsProps)
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             <div className="flex items-center">
                                                 <Calendar className="h-4 w-4 text-gray-400 mr-2" />
-                                                {new Date(profit.distribution_date).toLocaleDateString()}
+                                                {profit.distribution_date ? new Date(profit.distribution_date).toLocaleDateString() : 'N/A'}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end space-x-2">
-                                                <button className="text-blue-600 hover:text-blue-900">
+                                                <Link
+                                                    href={route('profits.show', profit.id)}
+                                                    className="text-blue-600 hover:text-blue-900"
+                                                    title="View"
+                                                >
                                                     <Eye className="h-4 w-4" />
-                                                </button>
-                                                <button className="text-green-600 hover:text-green-900">
-                                                    <CheckCircle className="h-4 w-4" />
-                                                </button>
-                                                <button className="text-red-600 hover:text-red-900">
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
+                                                </Link>
+                                                <Link
+                                                    href={route('profits.edit', profit.id)}
+                                                    className="text-green-600 hover:text-green-900"
+                                                    title="Edit"
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </Link>
+                                                {profit.status !== 'distributed' && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleDistribute(profit.id)}
+                                                            className="text-purple-600 hover:text-purple-900"
+                                                            title="Distribute"
+                                                        >
+                                                            <CheckCircle className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(profit.id)}
+                                                            className="text-red-600 hover:text-red-900"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

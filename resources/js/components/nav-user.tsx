@@ -1,5 +1,5 @@
 import { usePage } from '@inertiajs/react';
-import { ChevronsUpDown } from 'lucide-react';
+import { ChevronDown, ChevronUp, User } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -9,17 +9,19 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    useSidebar,
 } from '@/components/ui/sidebar';
 import { UserInfo } from '@/components/user-info';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
+import { useSidebarContext } from '@/hooks/use-sidebar';
 import type { SharedData } from '@/types';
 
-export function NavUser() {
-    const { auth } = usePage<SharedData>().props;
-    const { state } = useSidebar();
+const ChevronsUpDown = ChevronDown;
+
+export function NavUser({ user }: { user: User }) {
     const isMobile = useIsMobile();
+    const cleanup = useMobileNavigation();
 
     return (
         <SidebarMenu>
@@ -31,7 +33,7 @@ export function NavUser() {
                             className="group text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent"
                             data-test="sidebar-menu-button"
                         >
-                            <UserInfo user={auth.user} />
+                            <UserInfo user={user} />
                             <ChevronsUpDown className="ml-auto size-4" />
                         </SidebarMenuButton>
                     </DropdownMenuTrigger>
@@ -41,12 +43,10 @@ export function NavUser() {
                         side={
                             isMobile
                                 ? 'bottom'
-                                : state === 'collapsed'
-                                  ? 'left'
-                                  : 'bottom'
+                                : 'bottom'
                         }
                     >
-                        <UserMenuContent user={auth.user} />
+                        <UserMenuContent user={user} />
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>

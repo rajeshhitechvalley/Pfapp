@@ -116,17 +116,17 @@ class Plot extends Model
 
     public function property()
     {
-        return $this->belongsTo(PropertyProject::class, 'property_project_id');
+        return $this->belongsTo(PropertyProject::class, 'property_id');
     }
 
     public function project()
     {
-        return $this->belongsTo(PropertyProject::class, 'property_project_id');
+        return $this->belongsTo(PropertyProject::class, 'property_id');
     }
 
     public function investments()
     {
-        return $this->hasMany(Investment::class);
+        return $this->hasMany(Investment::class, 'plot_id');
     }
 
     public function plotHoldings()

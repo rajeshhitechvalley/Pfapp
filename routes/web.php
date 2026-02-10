@@ -17,10 +17,12 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
-Route::get('dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('dashboard', function () {
+    return Inertia::render('Dashboard/Index');
+})->middleware(['web', 'auth', 'verified'])->name('dashboard');
 
 // User Dashboard Routes
-Route::prefix('user-dashboard')->name('dashboard.')->middleware(['auth', 'verified'])->group(function () {
+Route::prefix('user-dashboard')->name('dashboard.')->middleware(['web', 'auth', 'verified'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('index');
     Route::get('/stats', [DashboardController::class, 'getStats'])->name('stats');
     Route::get('/projects', [DashboardController::class, 'getProjects'])->name('projects');
@@ -30,7 +32,7 @@ Route::prefix('user-dashboard')->name('dashboard.')->middleware(['auth', 'verifi
 });
 
 // Admin Routes - Admin only access
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin'])->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'verified', 'admin'])->group(function () {
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
     Route::get('/users', [AdminController::class, 'users'])->name('users');
     Route::get('/users/{id}', [AdminController::class, 'showUser'])->name('users.show');
@@ -63,6 +65,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
     Route::delete('/transactions/{id}', [AdminController::class, 'destroyTransaction'])->name('transactions.destroy');
     Route::get('/sales', [AdminController::class, 'sales'])->name('sales');
     Route::get('/profits', [AdminController::class, 'profits'])->name('profits');
+    Route::get('/profits/create', [AdminController::class, 'createProfit'])->name('profits.create');
+    Route::post('/profits', [AdminController::class, 'storeProfit'])->name('profits.store');
+    Route::get('/profits/{id}', [AdminController::class, 'showProfit'])->name('profits.show');
+    Route::get('/profits/{id}/edit', [AdminController::class, 'editProfit'])->name('profits.edit');
+    Route::put('/profits/{id}', [AdminController::class, 'updateProfit'])->name('profits.update');
+    Route::delete('/profits/{id}', [AdminController::class, 'destroyProfit'])->name('profits.destroy');
+    Route::post('/profits/{id}/distribute', [AdminController::class, 'distributeProfit'])->name('profits.distribute');
+    Route::post('/profits/distribute-bulk', [AdminController::class, 'distributeProfitsBulk'])->name('profits.distribute-bulk');
     Route::get('/properties', [AdminController::class, 'properties'])->name('properties');
     Route::get('/properties/create', [AdminController::class, 'createProperty'])->name('properties.create');
     Route::post('/properties/store', [AdminController::class, 'storeProperty'])->name('properties.store');
@@ -94,7 +104,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'admin']
 });
 
 // User Management Routes
-Route::prefix('users')->name('users.')->middleware(['auth', 'verified'])->group(function () {
+Route::prefix('users')->name('users.')->middleware(['web', 'auth', 'verified'])->group(function () {
     Route::get('/', [UserController::class, 'index'])->name('index');
     Route::get('/create', [UserController::class, 'create'])->name('create');
     Route::post('/', [UserController::class, 'store'])->name('store');
@@ -125,14 +135,19 @@ Route::prefix('teams')->name('teams.')->middleware(['auth', 'verified'])->group(
 });
 
 // Wallet & Payment Management Routes
-Route::prefix('wallet')->name('wallet.')->middleware(['auth', 'verified'])->group(function () {
+Route::prefix('wallet')->name('wallet.')->middleware(['web', 'auth', 'verified'])->group(function () {
+    Route::get('/deposit', [WalletController::class, 'depositPage'])->name('deposit.page');
+    Route::post('/deposit', [WalletController::class, 'deposit'])->name('deposit');
+    Route::get('/withdraw', [WalletController::class, 'withdrawPage'])->name('withdraw.page');
+    Route::post('/withdraw', [WalletController::class, 'withdraw'])->name('withdraw');
+    Route::get('/dashboard', function () {
+        return Inertia::render('Wallet/Dashboard');
+    })->middleware(['web', 'auth', 'verified'])->name('wallet.dashboard');
     Route::get('/', [WalletController::class, 'index'])->name('index');
     Route::get('/summary', [WalletController::class, 'getWalletSummary'])->name('summary');
     Route::get('/history', [WalletController::class, 'getTransactionHistory'])->name('history');
     Route::get('/export', [WalletController::class, 'exportTransactions'])->name('export');
     Route::get('/{id}', [WalletController::class, 'show'])->name('show');
-    Route::post('/deposit', [WalletController::class, 'deposit'])->name('deposit');
-    Route::post('/withdraw', [WalletController::class, 'withdraw'])->name('withdraw');
     Route::post('/registration-fee', [WalletController::class, 'payRegistrationFee'])->name('registration-fee');
     Route::post('/invest', [WalletController::class, 'investFromWallet'])->name('invest');
     Route::post('/credit-profit', [WalletController::class, 'creditProfit'])->name('credit-profit');
@@ -143,14 +158,14 @@ Route::prefix('wallet')->name('wallet.')->middleware(['auth', 'verified'])->grou
 });
 
 // Payment Gateway Routes
-Route::prefix('payment')->name('payment.')->middleware(['auth', 'verified'])->group(function () {
+Route::prefix('payment')->name('payment.')->middleware(['web', 'auth', 'verified'])->group(function () {
     Route::post('/order', [WalletController::class, 'createPaymentOrder'])->name('order');
     Route::post('/verify', [WalletController::class, 'verifyPayment'])->name('verify');
     Route::post('/webhook/{gateway}', [WalletController::class, 'processWebhook'])->name('webhook');
 });
 
 // Investment Management Routes
-Route::prefix('investment')->name('investment.')->middleware(['auth', 'verified'])->group(function () {
+Route::prefix('investment')->name('investment.')->middleware(['web', 'auth', 'verified'])->group(function () {
     Route::get('/', [InvestmentController::class, 'index'])->name('index');
     Route::get('/create', [InvestmentController::class, 'create'])->name('create');
     Route::post('/', [InvestmentController::class, 'store'])->name('store');
@@ -167,18 +182,74 @@ Route::prefix('investment')->name('investment.')->middleware(['auth', 'verified'
 // User Investment Dashboard
 Route::get('/investment/dashboard', function () {
     return Inertia::render('Investment/Dashboard');
-})->middleware(['auth', 'verified'])->name('investment.dashboard');
+})->middleware(['web', 'auth', 'verified'])->name('investment.dashboard');
+
+Route::get('/auth-test', function () {
+    return response()->json([
+        'authenticated' => Auth::check(),
+        'user' => Auth::user() ? Auth::user()->email : 'none',
+        'session_id' => session()->getId()
+    ]);
+})->middleware(['web']);
+
+Route::post('/test-login', function () {
+    $credentials = request()->only('email', 'password');
+    $user = \App\Models\User::where('email', $credentials['email'])->first();
+    
+    if ($user && \Hash::check($credentials['password'], $user->password)) {
+        \Auth::login($user);
+        return redirect('/wallet/deposit');
+    }
+    
+    return back()->withErrors(['email' => 'Invalid credentials']);
+})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
+Route::get('/debug-wallet', function () {
+    return response()->json([
+        'auth_check' => Auth::check(),
+        'auth_user' => Auth::user() ? Auth::user()->email : 'none',
+        'session_id' => session()->getId(),
+        'session_data' => session()->all(),
+        'request_headers' => request()->headers->all(),
+        'cookie_data' => request()->cookie->all(),
+    ]);
+})->middleware(['web']);
+
+Route::get('/public-wallet-test', function () {
+    return Inertia::render('Wallet/Deposit', [
+        'wallet' => (object) ['balance' => 1000],
+        'paymentMethods' => []
+    ]);
+});
+
+Route::get('/test-deposit-simple', function () {
+    return response()->json([
+        'message' => 'Route is working',
+        'timestamp' => now(),
+        'method' => request()->method(),
+        'path' => request()->path(),
+    ]);
+});
+
+Route::get('/test-wallet-no-auth', function () {
+    return Inertia::render('Wallet/Deposit');
+})->middleware(['web'])->name('test.wallet.no.auth');
+
+Route::get('/test-wallet', function () {
+    return Inertia::render('Wallet/Deposit');
+})->middleware(['web', 'auth', 'verified'])->name('test.wallet');
 
 // User Wallet Dashboard
 Route::get('/wallet/dashboard', function () {
     return Inertia::render('Wallet/Dashboard');
-})->middleware(['auth', 'verified'])->name('wallet.dashboard');
+})->middleware(['web', 'auth', 'verified'])->name('wallet.dashboard');
 
 // Enhanced Authentication Routes
 Route::prefix('auth')->name('auth.')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->name('register');
     Route::post('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
+    Route::get('/logout', [AuthController::class, 'logout'])->name('logout.get')->middleware('auth');
 });
 
 // Password Reset Routes
@@ -188,11 +259,11 @@ Route::prefix('password-reset')->name('password-reset.')->group(function () {
     Route::post('/reset', [AuthController::class, 'resetPassword'])->name('reset');
     Route::get('/form', function () {
         return Inertia::render('auth/password-reset');
-    })->name('form');
+    })->middleware(['web'])->name('form');
 });
 
 // Profile Management Routes
-Route::prefix('profile')->name('profile.')->middleware(['auth', 'verified'])->group(function () {
+Route::prefix('profile')->name('profile.')->middleware(['web', 'auth', 'verified'])->group(function () {
     Route::get('/', function () {
         return Inertia::render('profile');
     })->name('index');
@@ -202,7 +273,7 @@ Route::prefix('profile')->name('profile.')->middleware(['auth', 'verified'])->gr
 });
 
 // Team Management Routes
-Route::prefix('teams')->name('teams.')->middleware(['auth', 'verified'])->group(function () {
+Route::prefix('teams')->name('teams.')->middleware(['web', 'auth', 'verified'])->group(function () {
     Route::get('/', [TeamController::class, 'index'])->name('index');
     Route::post('/store', [TeamController::class, 'store'])->name('store');
     Route::get('/create', function () {
@@ -223,10 +294,10 @@ Route::prefix('teams')->name('teams.')->middleware(['auth', 'verified'])->group(
 // User Team Dashboard
 Route::get('/team/dashboard', function () {
     return Inertia::render('Teams/Dashboard');
-})->middleware(['auth', 'verified'])->name('team.dashboard');
+})->middleware(['web', 'auth', 'verified'])->name('team.dashboard');
 
 // API Routes for Team Management
-Route::prefix('api')->middleware(['auth', 'verified'])->group(function () {
+Route::prefix('api')->middleware(['web', 'auth', 'verified'])->group(function () {
     Route::get('/user/team', function () {
         $user = auth()->user();
         $team = $user->ledTeam ?? $user->team;
