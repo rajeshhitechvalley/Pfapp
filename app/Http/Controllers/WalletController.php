@@ -112,7 +112,7 @@ class WalletController extends Controller
     public function deposit(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'amount' => 'required|numeric|min:500',
+            'amount' => 'required|numeric|min:100',
             'payment_method_id' => 'required|exists:payment_methods,id',
             'payment_mode' => 'required|in:cash,bank_transfer,upi,cheque,online',
             'payment_reference' => 'nullable|string|max:255',
@@ -200,7 +200,7 @@ class WalletController extends Controller
     public function withdraw(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'amount' => 'required|numeric|min:500',
+            'amount' => 'required|numeric|min:100',
             'payment_method_id' => 'required|exists:payment_methods,id',
             'payment_mode' => 'required|in:cash,bank_transfer,upi,cheque,online',
             'bank_account' => 'required_if:payment_mode,bank_transfer,cheque|string|max:255',

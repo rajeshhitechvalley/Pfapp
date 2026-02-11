@@ -27,6 +27,7 @@ import {
     SidebarGroup,
     SidebarGroupLabel,
     SidebarProvider,
+    SidebarInset,
     useSidebar,
 } from '@/components/ui/sidebar';
 import { NavFooter } from '@/components/nav-footer';
@@ -132,22 +133,20 @@ export default function AdminLayout({ children, title = 'Admin Panel', breadcrum
     const { auth } = usePage<SharedData>().props;
     
     return (
-        <div className="min-h-screen bg-gray-50">
+        <SidebarProvider>
             <Head title={title} />
-            
-            <SidebarProvider>
-                <Sidebar collapsible="icon" variant="inset">
-                    <SidebarHeader>
-                        <SidebarMenu>
-                            <SidebarMenuItem>
-                                <SidebarMenuButton size="lg" asChild>
-                                    <Link href="/admin/dashboard" prefetch>
-                                        <AppLogo />
-                                    </Link>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                        </SidebarMenu>
-                    </SidebarHeader>
+            <Sidebar collapsible="icon" variant="inset">
+                <SidebarHeader>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton size="lg" asChild>
+                                <Link href="/admin/dashboard" prefetch>
+                                    <AppLogo />
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarHeader>
 
                 <SidebarContent>
                     <SidebarGroup>
@@ -213,35 +212,38 @@ export default function AdminLayout({ children, title = 'Admin Panel', breadcrum
                     <NavUser user={auth.user} />
                 </SidebarFooter>
             </Sidebar>
-        </SidebarProvider>
-
-            <div className="lg:pl-64">
-                <main className="p-6">
+            
+            <div className="flex-1 overflow-auto">
+                <div className="min-h-screen bg-gray-50">
                     {breadcrumbs.length > 0 && (
-                        <nav className="flex mb-4" aria-label="Breadcrumb">
-                            <ol className="inline-flex items-center space-x-1 md:space-x-3">
-                                {breadcrumbs.map((crumb, index) => (
-                                    <li key={index} className="inline-flex items-center">
-                                        {index > 0 && (
-                                            <svg className="w-3 h-3 text-gray-400 mx-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 6 10">
-                                                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 9 4-4-4-4"/>
-                                            </svg>
-                                        )}
-                                        {crumb.href ? (
-                                            <Link href={crumb.href} className="text-gray-700 hover:text-gray-900">
-                                                {crumb.label}
-                                            </Link>
-                                        ) : (
-                                            <span className="text-gray-500">{crumb.label}</span>
-                                        )}
-                                    </li>
-                                ))}
-                            </ol>
-                        </nav>
+                        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8">
+                            <nav className="flex py-3" aria-label="Breadcrumb">
+                                <ol className="inline-flex items-center space-x-1 md:space-x-3">
+                                    {breadcrumbs.map((crumb, index) => (
+                                        <li key={index} className="inline-flex items-center">
+                                            {index > 0 && (
+                                                <svg className="w-3 h-3 text-gray-400 mx-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 6 10">
+                                                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 9 4-4-4-4"/>
+                                                </svg>
+                                            )}
+                                            {crumb.href ? (
+                                                <Link href={crumb.href} className="text-gray-700 hover:text-gray-900">
+                                                    {crumb.label}
+                                                </Link>
+                                            ) : (
+                                                <span className="text-gray-500">{crumb.label}</span>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ol>
+                            </nav>
+                        </div>
                     )}
-                    {children}
-                </main>
+                    <div className="p-4 sm:p-6 lg:p-8">
+                        {children}
+                    </div>
+                </div>
             </div>
-        </div>
+        </SidebarProvider>
     );
 }

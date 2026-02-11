@@ -347,7 +347,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function createTransaction(): Response
+    public function createTransaction(): InertiaResponse
     {
         $users = \App\Models\User::with('wallet')
             ->select('id', 'name', 'email', 'role')
@@ -417,7 +417,7 @@ class AdminController extends Controller
             ->with('success', 'Transaction created successfully!');
     }
 
-    public function showTransaction($id): Response
+    public function showTransaction($id): InertiaResponse
     {
         $transaction = Transaction::with([
             'user.wallet',
@@ -431,7 +431,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function editTransaction($id): Response
+    public function editTransaction($id): InertiaResponse
     {
         $transaction = Transaction::with(['user.wallet', 'wallet', 'paymentMethod'])
             ->findOrFail($id);
@@ -556,7 +556,7 @@ class AdminController extends Controller
             ->with('success', 'Transaction deleted successfully!');
     }
 
-    public function createProperty(): Response
+    public function createProperty(): InertiaResponse
     {
         $users = \App\Models\User::select('id', 'name', 'email', 'role')
             ->orderBy('name')
@@ -615,7 +615,7 @@ class AdminController extends Controller
             ->with('success', 'Property created successfully!');
     }
 
-    public function showProperty($id): Response
+    public function showProperty($id): InertiaResponse
     {
         $property = \App\Models\Property::with([
             'plots',
@@ -628,7 +628,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function editProperty($id): Response
+    public function editProperty($id): InertiaResponse
     {
         $property = \App\Models\Property::findOrFail($id);
 
@@ -1130,7 +1130,7 @@ class AdminController extends Controller
         return redirect()->back()->with('success', 'User deleted successfully!');
     }
 
-    public function showUser($id): Response
+    public function showUser($id): InertiaResponse
     {
         $user = User::with(['wallet', 'ledTeam', 'teamMemberships.team'])
             ->findOrFail($id);
@@ -1140,7 +1140,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function editUser($id): Response
+    public function editUser($id): InertiaResponse
     {
         $user = User::with(['wallet', 'ledTeam', 'teamMemberships.team'])
             ->findOrFail($id);
@@ -1204,7 +1204,7 @@ class AdminController extends Controller
         return redirect()->back()->with('success', 'Team deleted successfully!');
     }
 
-    public function createTeam(): Response
+    public function createTeam(): InertiaResponse
     {
         // Get available users for team leader selection
         $availableUsers = User::select('id', 'name', 'email', 'role')
@@ -1640,7 +1640,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function createWallet(): Response
+    public function createWallet(): InertiaResponse
     {
         // Get users without wallets for selection
         $usersWithoutWallets = \App\Models\User::whereDoesntHave('wallet')
@@ -1675,7 +1675,7 @@ class AdminController extends Controller
             ->with('success', 'Wallet created successfully!');
     }
 
-    public function showWallet($id): Response
+    public function showWallet($id): InertiaResponse
     {
         $wallet = \App\Models\Wallet::with(['user', 'transactions.paymentMethod'])
             ->findOrFail($id);
@@ -1685,7 +1685,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function editWallet($id): Response
+    public function editWallet($id): InertiaResponse
     {
         $wallet = \App\Models\Wallet::with('user')
             ->findOrFail($id);
@@ -1727,7 +1727,7 @@ class AdminController extends Controller
     }
 
     // Plot Features CRUD Methods
-    public function plotFeatures(): Response
+    public function plotFeatures(): InertiaResponse
     {
         $plots = Plot::with(['property'])
             ->orderBy('created_at', 'desc')
@@ -1746,7 +1746,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function createPlotFeature(): Response
+    public function createPlotFeature(): InertiaResponse
     {
         $properties = \App\Models\Property::all();
         
@@ -1846,7 +1846,7 @@ class AdminController extends Controller
             ->with('success', 'Plot created successfully!');
     }
 
-    public function editPlotFeature($id): Response
+    public function editPlotFeature($id): InertiaResponse
     {
         $plot = Plot::with(['property'])->findOrFail($id);
         $properties = \App\Models\Property::all();
